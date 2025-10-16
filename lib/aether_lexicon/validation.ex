@@ -1,27 +1,102 @@
 defmodule AetherLexicon.Validation do
   @moduledoc """
-  Validation module for ATProto lexicon schemas.
+  Validates data against ATProto lexicon schemas.
 
-  This module provides functionality to validate data against lexicon schemas,
-  matching the behavior of the official JavaScript implementation.
+  This module provides comprehensive validation for ATProto lexicon schemas,
+  supporting all lexicon types including objects, arrays, strings, integers,
+  booleans, refs, unions, and more.
+
+  The implementation matches the behavior of the official JavaScript implementation,
+  ensuring compatibility with the ATProto specification.
+
+  ## Supported Types
+
+    * `:object` - Structured data with properties, required fields, and defaults
+    * `:array` - Lists with optional item type constraints
+    * `:string` - Text with length, format, and pattern validation
+    * `:integer` - Numeric values with range constraints
+    * `:boolean` - True/false values
+    * `:bytes` - Binary data with size constraints
+    * `:ref` - References to other definitions
+    * `:union` - One of several possible types
+    * `:cid-link` - Content identifiers
+    * `:blob` - Binary large objects
+    * `:token` - Authentication tokens
+    * `:record` - Record types
+    * `:unknown` - Untyped data
+
+  ## Examples
+
+      # Load a schema
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.post",
+        "defs" => %{
+          "main" => %{
+            "type" => "object",
+            "required" => ["text"],
+            "properties" => %{
+              "text" => %{"type" => "string", "maxLength" => 300},
+              "createdAt" => %{"type" => "string", "format" => "datetime"}
+            }
+          }
+        }
+      }
+
+      # Valid data
+      AetherLexicon.Validation.validate(schema, "main", %{
+        "text" => "Hello world!",
+        "createdAt" => "2024-01-01T00:00:00Z"
+      })
+      #=> {:ok, %{"text" => "Hello world!", "createdAt" => "2024-01-01T00:00:00Z"}}
+
+      # Invalid data (missing required field)
+      AetherLexicon.Validation.validate(schema, "main", %{})
+      #=> {:error, "main must have the property \\"text\\""}
+
+      # Invalid data (string too long)
+      long_text = String.duplicate("a", 301)
+      AetherLexicon.Validation.validate(schema, "main", %{"text" => long_text})
+      #=> {:error, "main/text must not be longer than 300 characters"}
   """
 
   alias AetherLexicon.Validation.Formats
+  alias AetherLexicon.Validation.Validators
 
   @type validation_result :: {:ok, any()} | {:error, String.t()}
 
   @doc """
   Validates data against a lexicon schema definition.
 
-  ## Parameters
-    - schema: The loaded schema map containing all definitions
-    - def_name: The name of the definition within the schema (e.g., "label", "selfLabel")
-    - data: The data to validate
+  Takes a schema map, a definition name, and data to validate. Returns the
+  validated data (potentially with defaults applied) or an error message.
 
-  ## Returns
-    - `{:ok, validated_data}` - Data is valid (may include applied defaults)
-    - `{:error, error_message}` - Data is invalid with error details
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.label",
+        "defs" => %{
+          "label" => %{
+            "type" => "object",
+            "required" => ["val"],
+            "properties" => %{
+              "val" => %{"type" => "string"}
+            }
+          }
+        }
+      }
+
+      validate(schema, "label", %{"val" => "test"})
+      #=> {:ok, %{"val" => "test"}}
+
+      validate(schema, "label", %{})
+      #=> {:error, "label must have the property \\"val\\""}
+
+      validate(schema, "nonexistent", %{})
+      #=> {:error, "Definition 'nonexistent' not found in schema"}
   """
+  @spec validate(map(), String.t(), any()) :: validation_result()
   def validate(schema, def_name, data) do
     case get_definition(schema, def_name) do
       {:ok, definition} ->
@@ -33,17 +108,15 @@ defmodule AetherLexicon.Validation do
   end
 
   # Get a specific definition from the schema
-  defp get_definition(schema, def_name) do
-    case schema do
-      %{"defs" => defs} when is_map(defs) ->
-        case Map.get(defs, def_name) do
-          nil -> {:error, "Definition '#{def_name}' not found in schema"}
-          definition -> {:ok, definition}
-        end
-
-      _ ->
-        {:error, "Invalid schema: missing 'defs' field"}
+  defp get_definition(%{"defs" => defs}, def_name) when is_map(defs) do
+    case Map.fetch(defs, def_name) do
+      {:ok, definition} -> {:ok, definition}
+      :error -> {:error, "Definition '#{def_name}' not found in schema"}
     end
+  end
+
+  defp get_definition(_schema, _def_name) do
+    {:error, "Invalid schema: missing 'defs' field"}
   end
 
   # Validate data against a specific definition
@@ -55,44 +128,32 @@ defmodule AetherLexicon.Validation do
   defp validate_one_of(schema, path, definition, value)
 
   # Handle union types
-  defp validate_one_of(schema, path, %{"type" => "union"} = def, value) do
-    unless is_map(value) and Map.has_key?(value, "$type") do
-      {:error, "#{path} must be an object which includes the \"$type\" property"}
+  defp validate_one_of(schema, path, %{"type" => "union"} = definition, value)
+       when is_map(value) and is_map_key(value, "$type") do
+    type_value = value["$type"]
+    refs = definition["refs"]
+
+    if refs_contain_type?(refs, type_value) do
+      with {:ok, concrete_def} <- get_def_from_schema(schema, type_value) do
+        validate_one_of(schema, path, concrete_def, value)
+      end
     else
-
-      type_value = value["$type"]
-
-      if refs_contain_type?(def["refs"], type_value) do
-        # Type is in the union, validate against it
-        concrete_def = get_def_from_schema(schema, type_value)
-
-        case concrete_def do
-          {:ok, def_to_validate} ->
-            validate_one_of(schema, path, def_to_validate, value)
-
-          {:error, _} = error ->
-            error
-        end
+      if definition["closed"] do
+        {:error, "#{path} $type must be one of #{Enum.join(refs, ", ")}"}
       else
-        # Type not in union
-        if def["closed"] do
-          {:error, "#{path} $type must be one of #{Enum.join(def["refs"], ", ")}"}
-        else
-          # Open union - allow unknown types
-          {:ok, value}
-        end
+        {:ok, value}
       end
     end
   end
 
+  defp validate_one_of(_schema, path, %{"type" => "union"}, _value) do
+    {:error, "#{path} must be an object which includes the \"$type\" property"}
+  end
+
   # Handle ref types
   defp validate_one_of(schema, path, %{"type" => "ref", "ref" => ref}, value) do
-    case get_def_from_schema(schema, ref) do
-      {:ok, concrete_def} ->
-        validate_one_of(schema, path, concrete_def, value)
-
-      {:error, _} = error ->
-        error
+    with {:ok, concrete_def} <- get_def_from_schema(schema, ref) do
+      validate_one_of(schema, path, concrete_def, value)
     end
   end
 
@@ -187,12 +248,24 @@ defmodule AetherLexicon.Validation do
 
   # Array validation
   defp validate_array(schema, path, definition, value) when is_list(value) do
-    # Check length constraints
-    with :ok <- validate_array_length(definition, value, path) do
-      # Validate each item
-      items_def = Map.get(definition, "items")
+    with :ok <- Validators.validate_length(value,
+                  [min_length: definition["minLength"], max_length: definition["maxLength"]],
+                  path, "elements"),
+         {:ok, _} <- validate_array_items(schema, path, definition, value) do
+      {:ok, value}
+    end
+  end
 
-      if items_def do
+  defp validate_array(_schema, path, _definition, value) do
+    {:error, "#{path} must be an array, got #{inspect(value)}"}
+  end
+
+  defp validate_array_items(schema, path, definition, value) do
+    case Map.get(definition, "items") do
+      nil ->
+        {:ok, value}
+
+      items_def ->
         value
         |> Enum.with_index()
         |> Enum.reduce_while({:ok, value}, fn {item, index}, {:ok, _acc} ->
@@ -203,37 +276,13 @@ defmodule AetherLexicon.Validation do
             {:error, _} = error -> {:halt, error}
           end
         end)
-      else
-        {:ok, value}
-      end
-    end
-  end
-
-  defp validate_array(_schema, path, _definition, value) do
-    {:error, "#{path} must be an array, got #{inspect(value)}"}
-  end
-
-  defp validate_array_length(definition, value, path) do
-    max_length = definition["maxLength"]
-    min_length = definition["minLength"]
-    length = length(value)
-
-    cond do
-      max_length && length > max_length ->
-        {:error, "#{path} must not have more than #{max_length} elements"}
-
-      min_length && length < min_length ->
-        {:error, "#{path} must not have fewer than #{min_length} elements"}
-
-      true ->
-        :ok
     end
   end
 
   # String validation
   defp validate_string(path, definition, value) when is_binary(value) do
-    with :ok <- validate_string_const(definition, value, path),
-         :ok <- validate_string_enum(definition, value, path),
+    with :ok <- Validators.validate_const(value, definition["const"], path),
+         :ok <- Validators.validate_enum(value, definition["enum"], path),
          :ok <- validate_string_length(definition, value, path),
          :ok <- validate_string_graphemes(definition, value, path),
          {:ok, _} <- validate_string_format(definition, value, path) do
@@ -242,40 +291,14 @@ defmodule AetherLexicon.Validation do
   end
 
   defp validate_string(path, definition, nil) do
-    case definition["default"] do
+    case Validators.get_default("string", definition["default"]) do
       nil -> {:error, "#{path} must be a string"}
-      default when is_binary(default) -> {:ok, default}
-      _ -> {:error, "#{path} must be a string"}
+      default -> {:ok, default}
     end
   end
 
   defp validate_string(path, _definition, value) do
     {:error, "#{path} must be a string, got #{inspect(value)}"}
-  end
-
-  defp validate_string_const(definition, value, path) do
-    case definition["const"] do
-      nil -> :ok
-      const when const == value -> :ok
-      const -> {:error, "#{path} must be #{const}"}
-    end
-  end
-
-  defp validate_string_enum(definition, value, path) do
-    case definition["enum"] do
-      nil ->
-        :ok
-
-      enum when is_list(enum) ->
-        if value in enum do
-          :ok
-        else
-          {:error, "#{path} must be one of (#{Enum.join(enum, "|")})"}
-        end
-
-      _ ->
-        :ok
-    end
   end
 
   # String byte length validation (UTF-8 optimized like official implementation)
@@ -339,27 +362,25 @@ defmodule AetherLexicon.Validation do
     end
   end
 
-  defp validate_string_format(definition, value, path) do
-    case definition["format"] do
-      nil -> {:ok, value}
-      format -> Formats.validate_format(format, value, path)
-    end
-  end
+  defp validate_string_format(%{"format" => format}, value, path),
+    do: Formats.validate_format(format, value, path)
+
+  defp validate_string_format(_definition, value, _path), do: {:ok, value}
 
   # Integer validation
   defp validate_integer(path, definition, value) when is_integer(value) do
-    with :ok <- validate_integer_const(definition, value, path),
-         :ok <- validate_integer_enum(definition, value, path),
-         :ok <- validate_integer_range(definition, value, path) do
+    with :ok <- Validators.validate_const(value, definition["const"], path),
+         :ok <- Validators.validate_enum(value, definition["enum"], path),
+         :ok <- Validators.validate_range(value,
+                  [minimum: definition["minimum"], maximum: definition["maximum"]], path) do
       {:ok, value}
     end
   end
 
   defp validate_integer(path, definition, nil) do
-    case definition["default"] do
+    case Validators.get_default("integer", definition["default"]) do
       nil -> {:error, "#{path} must be an integer"}
-      default when is_integer(default) -> {:ok, default}
-      _ -> {:error, "#{path} must be an integer"}
+      default -> {:ok, default}
     end
   end
 
@@ -367,61 +388,17 @@ defmodule AetherLexicon.Validation do
     {:error, "#{path} must be an integer, got #{inspect(value)}"}
   end
 
-  defp validate_integer_const(definition, value, path) do
-    case definition["const"] do
-      nil -> :ok
-      const when const == value -> :ok
-      const -> {:error, "#{path} must be #{const}"}
-    end
-  end
-
-  defp validate_integer_enum(definition, value, path) do
-    case definition["enum"] do
-      nil ->
-        :ok
-
-      enum when is_list(enum) ->
-        if value in enum do
-          :ok
-        else
-          {:error, "#{path} must be one of (#{Enum.join(enum, "|")})"}
-        end
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp validate_integer_range(definition, value, path) do
-    max = definition["maximum"]
-    min = definition["minimum"]
-
-    cond do
-      max && value > max ->
-        {:error, "#{path} can not be greater than #{max}"}
-
-      min && value < min ->
-        {:error, "#{path} can not be less than #{min}"}
-
-      true ->
-        :ok
-    end
-  end
-
   # Boolean validation
   defp validate_boolean(path, definition, value) when is_boolean(value) do
-    case definition["const"] do
-      nil -> {:ok, value}
-      const when const == value -> {:ok, value}
-      const -> {:error, "#{path} must be #{const}"}
+    with :ok <- Validators.validate_const(value, definition["const"], path) do
+      {:ok, value}
     end
   end
 
   defp validate_boolean(path, definition, nil) do
-    case definition["default"] do
+    case Validators.get_default("boolean", definition["default"]) do
       nil -> {:error, "#{path} must be a boolean"}
-      default when is_boolean(default) -> {:ok, default}
-      _ -> {:error, "#{path} must be a boolean"}
+      default -> {:ok, default}
     end
   end
 
@@ -431,19 +408,10 @@ defmodule AetherLexicon.Validation do
 
   # Bytes validation
   defp validate_bytes(path, definition, value) when is_binary(value) do
-    byte_length = byte_size(value)
-    max_length = definition["maxLength"]
-    min_length = definition["minLength"]
-
-    cond do
-      max_length && byte_length > max_length ->
-        {:error, "#{path} must not be larger than #{max_length} bytes"}
-
-      min_length && byte_length < min_length ->
-        {:error, "#{path} must not be smaller than #{min_length} bytes"}
-
-      true ->
-        {:ok, value}
+    with :ok <- Validators.validate_length(value,
+                  [min_length: definition["minLength"], max_length: definition["maxLength"]],
+                  path, "bytes") do
+      {:ok, value}
     end
   end
 
@@ -451,19 +419,18 @@ defmodule AetherLexicon.Validation do
     {:error, "#{path} must be a byte array, got #{inspect(value)}"}
   end
 
-  # CID Link validation - basic check for now
+  # CID Link validation
+  @cid_regex ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})/
+
   defp validate_cid_link(path, value) when is_binary(value) do
-    # Basic CID format check - starts with b or Q (CIDv0/v1)
-    if String.match?(value, ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})/) do
+    if String.match?(value, @cid_regex) do
       {:ok, value}
     else
       {:error, "#{path} must be a CID"}
     end
   end
 
-  defp validate_cid_link(path, _value) do
-    {:error, "#{path} must be a CID"}
-  end
+  defp validate_cid_link(path, _value), do: {:error, "#{path} must be a CID"}
 
   # Unknown type - accepts any object
   defp validate_unknown(_path, value) when is_map(value) do
@@ -475,97 +442,61 @@ defmodule AetherLexicon.Validation do
   end
 
   # Blob validation - expects a map with blob structure
+  defp validate_blob(_path, %{"$type" => "blob"} = value), do: {:ok, value}
+
   defp validate_blob(path, value) when is_map(value) do
-    # In JSON representation, blobs have $type, ref, mimeType, size
-    cond do
-      Map.has_key?(value, "$type") and value["$type"] == "blob" ->
-        {:ok, value}
-
-      Map.has_key?(value, "ref") and Map.has_key?(value, "mimeType") ->
-        {:ok, value}
-
-      true ->
-        {:error, "#{path} should be a blob ref"}
+    if Map.has_key?(value, "ref") and Map.has_key?(value, "mimeType") do
+      {:ok, value}
+    else
+      {:error, "#{path} should be a blob ref"}
     end
   end
 
-  defp validate_blob(path, _value) do
-    {:error, "#{path} should be a blob ref"}
-  end
+  defp validate_blob(path, _value), do: {:error, "#{path} should be a blob ref"}
 
   # Token validation - essentially an empty marker
   defp validate_token(_path, _value) do
     {:ok, nil}
   end
 
-  # Record validation - validates the record.record field
-  defp validate_record(schema, path, definition, value) do
-    case definition["record"] do
-      record_def when is_map(record_def) ->
-        validate_object(schema, path, record_def, value)
+  # Record validation
+  defp validate_record(schema, path, %{"record" => record_def}, value) when is_map(record_def),
+    do: validate_object(schema, path, record_def, value)
 
-      _ ->
-        {:error, "Invalid record definition at #{path}"}
-    end
-  end
+  defp validate_record(_schema, path, _definition, _value),
+    do: {:error, "Invalid record definition at #{path}"}
 
   # Helper: Get default value from definition
-  defp get_default_value(definition) do
-    case {definition["type"], definition["default"]} do
-      {"string", default} when is_binary(default) -> default
-      {"integer", default} when is_integer(default) -> default
-      {"boolean", default} when is_boolean(default) -> default
-      _ -> nil
-    end
-  end
+  defp get_default_value(%{"type" => type, "default" => default}),
+    do: Validators.get_default(type, default)
+
+  defp get_default_value(_definition), do: nil
 
   # Helper: Check if refs contain a type (with implicit #main handling)
   defp refs_contain_type?(refs, type) do
     lex_uri = to_lex_uri(type)
 
-    cond do
-      lex_uri in refs ->
-        true
-
-      String.ends_with?(lex_uri, "#main") ->
-        base = String.slice(lex_uri, 0..-6//1)
-        base in refs
-
-      not String.contains?(lex_uri, "#") ->
-        "#{lex_uri}#main" in refs
-
-      true ->
-        false
-    end
+    lex_uri in refs or
+      (String.ends_with?(lex_uri, "#main") and String.slice(lex_uri, 0..-6//1) in refs) or
+      (not String.contains?(lex_uri, "#") and "#{lex_uri}#main" in refs)
   end
 
   # Helper: Convert to lex URI format
-  defp to_lex_uri(str) when is_binary(str) do
-    cond do
-      String.starts_with?(str, "lex:") -> str
-      String.starts_with?(str, "#") -> str
-      true -> "lex:#{str}"
-    end
-  end
+  defp to_lex_uri("lex:" <> _ = str), do: str
+  defp to_lex_uri("#" <> _ = str), do: str
+  defp to_lex_uri(str), do: "lex:#{str}"
 
   # Helper: Get definition from schema by ref
+  defp get_def_from_schema(schema, "#" <> def_name) do
+    get_definition(schema, def_name)
+  end
+
   defp get_def_from_schema(schema, ref) when is_binary(ref) do
-    # Handle local refs like "#selfLabel" or full refs like "com.atproto.label.defs#selfLabels"
-    cond do
-      String.starts_with?(ref, "#") ->
-        # Local reference
-        def_name = String.trim_leading(ref, "#")
-        get_definition(schema, def_name)
-
-      String.contains?(ref, "#") ->
-        # Cross-schema reference - for now, just try to extract the def name
-        # Full implementation would need a lexicon collection
-        [_schema_id, def_name] = String.split(ref, "#", parts: 2)
-        get_definition(schema, def_name)
-
-      true ->
-        # Implicit #main
-        get_definition(schema, "main")
+    if String.contains?(ref, "#") do
+      [_schema_id, def_name] = String.split(ref, "#", parts: 2)
+      get_definition(schema, def_name)
+    else
+      get_definition(schema, "main")
     end
   end
 end

@@ -1,24 +1,62 @@
 defmodule AetherLexicon.Validation.Formats do
   @moduledoc """
-  String format validators for ATProto lexicon types.
+  String format validators for ATProto lexicon schemas.
 
-  Implements validation for various AT Protocol string formats including:
-  - datetime (ISO 8601 / RFC 3339)
-  - uri (generic URI format)
-  - at-uri (AT Protocol URIs like at://did/collection/rkey)
-  - did (Decentralized Identifiers)
-  - handle (DNS-like handles)
-  - at-identifier (either did or handle)
-  - nsid (Namespace IDs like com.example.type)
-  - cid (Content Identifiers)
-  - language (BCP 47 language tags)
-  - tid (Timestamp IDs)
-  - record-key (Valid record keys)
+  This module implements validation for various AT Protocol string formats,
+  ensuring data conforms to the specifications required by the ATProto ecosystem.
+
+  ## Supported Formats
+
+    * `"datetime"` - ISO 8601 / RFC 3339 datetime strings
+    * `"uri"` - Generic URI format
+    * `"at-uri"` - AT Protocol URIs (e.g., `at://did/collection/rkey`)
+    * `"did"` - Decentralized Identifiers
+    * `"handle"` - DNS-like handles (e.g., `user.bsky.social`)
+    * `"at-identifier"` - Either a DID or handle
+    * `"nsid"` - Namespace IDs (e.g., `com.atproto.server.createSession`)
+    * `"cid"` - Content Identifiers
+    * `"language"` - BCP 47 language tags (e.g., `en-US`)
+    * `"tid"` - Timestamp IDs
+    * `"record-key"` - Valid record keys
+
+  ## Examples
+
+      # Valid datetime
+      datetime("/timestamp", "2024-01-01T00:00:00Z")
+      #=> {:ok, "2024-01-01T00:00:00Z"}
+
+      # Invalid datetime
+      datetime("/timestamp", "not-a-date")
+      #=> {:error, "/timestamp must be an valid atproto datetime (both RFC-3339 and ISO-8601)"}
+
+      # Valid handle
+      handle("/handle", "user.bsky.social")
+      #=> {:ok, "user.bsky.social"}
+
+      # Valid DID
+      did("/did", "did:plc:abc123xyz")
+      #=> {:ok, "did:plc:abc123xyz"}
   """
 
   @doc """
-  Validates a value against a specific format.
+  Validates a value against a specific format type.
+
+  Acts as a dispatcher to the appropriate format validator based on the
+  format name. Unknown formats are accepted without validation.
+
+  ## Examples
+
+      validate_format("datetime", "2024-01-01T00:00:00Z", "/timestamp")
+      #=> {:ok, "2024-01-01T00:00:00Z"}
+
+      validate_format("did", "did:plc:abc123", "/identifier")
+      #=> {:ok, "did:plc:abc123"}
+
+      validate_format("unknown-format", "any-value", "/field")
+      #=> {:ok, "any-value"}
   """
+  @spec validate_format(String.t(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, String.t()}
   def validate_format(format, value, path) do
     case format do
       "datetime" -> datetime(path, value)
@@ -36,7 +74,24 @@ defmodule AetherLexicon.Validation.Formats do
     end
   end
 
-  # ISO 8601 / RFC 3339 datetime validation
+  @doc """
+  Validates an ISO 8601 / RFC 3339 datetime string.
+
+  ## Examples
+
+      datetime("/createdAt", "2024-01-01T00:00:00Z")
+      #=> {:ok, "2024-01-01T00:00:00Z"}
+
+      datetime("/createdAt", "2024-01-01T12:30:00.123Z")
+      #=> {:ok, "2024-01-01T12:30:00.123Z"}
+
+      datetime("/createdAt", "2024-01-01T12:00:00+05:00")
+      #=> {:ok, "2024-01-01T12:00:00+05:00"}
+
+      datetime("/createdAt", "not-a-date")
+      #=> {:error, "/createdAt must be an valid atproto datetime (both RFC-3339 and ISO-8601)"}
+  """
+  @spec datetime(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def datetime(path, value) do
     # Basic ISO 8601 format check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|[+-]HH:MM)?
     iso8601_regex =
@@ -78,7 +133,27 @@ defmodule AetherLexicon.Validation.Formats do
     end
   end
 
-  # DID (Decentralized Identifier) validation
+  @doc """
+  Validates a Decentralized Identifier (DID).
+
+  DIDs follow the format `did:method:identifier` where method specifies the
+  DID method (e.g., `plc`, `web`, `key`) and identifier is method-specific.
+
+  ## Examples
+
+      did("/identifier", "did:plc:abc123xyz")
+      #=> {:ok, "did:plc:abc123xyz"}
+
+      did("/identifier", "did:web:example.com")
+      #=> {:ok, "did:web:example.com"}
+
+      did("/identifier", "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+      #=> {:ok, "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"}
+
+      did("/identifier", "not-a-did")
+      #=> {:error, "/identifier must be a valid did"}
+  """
+  @spec did(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def did(path, value) do
     # did:method:identifier format
     # Common methods: plc, web, key
@@ -91,7 +166,27 @@ defmodule AetherLexicon.Validation.Formats do
     end
   end
 
-  # Handle validation (DNS-like format)
+  @doc """
+  Validates a handle in DNS-like format.
+
+  Handles are domain names used as user identifiers in ATProto, following
+  standard DNS naming rules with a maximum length of 253 characters.
+
+  ## Examples
+
+      handle("/handle", "user.bsky.social")
+      #=> {:ok, "user.bsky.social"}
+
+      handle("/handle", "alice.example.com")
+      #=> {:ok, "alice.example.com"}
+
+      handle("/handle", "invalid..handle")
+      #=> {:error, "/handle must be a valid handle"}
+
+      handle("/handle", "toolonghandle" <> String.duplicate("a", 250))
+      #=> {:error, "/handle must be a valid handle"}
+  """
+  @spec handle(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def handle(path, value) do
     # Domain name format: labels separated by dots
     # Each label starts with alphanumeric, can contain hyphens
@@ -125,7 +220,24 @@ defmodule AetherLexicon.Validation.Formats do
     end
   end
 
-  # NSID (Namespace ID) validation
+  @doc """
+  Validates a Namespace ID (NSID).
+
+  NSIDs use reversed domain notation to uniquely identify lexicon types and
+  methods, with a maximum length of 317 characters.
+
+  ## Examples
+
+      nsid("/lexicon", "com.atproto.server.createSession")
+      #=> {:ok, "com.atproto.server.createSession"}
+
+      nsid("/lexicon", "app.bsky.feed.post")
+      #=> {:ok, "app.bsky.feed.post"}
+
+      nsid("/lexicon", "invalid")
+      #=> {:error, "/lexicon must be a valid nsid"}
+  """
+  @spec nsid(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def nsid(path, value) do
     # Format: reversed domain notation like com.example.type or com.atproto.server.createSession
     # Minimum 3 segments, alphanumeric (both cases) with hyphens and dots
