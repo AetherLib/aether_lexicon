@@ -410,71 +410,94 @@ defmodule AetherLexicon.Validation do
   defp validate_by_type(_schema, path, %{"type" => type}, _value),
     do: {:error, "Unsupported type '#{type}' at #{path}"}
 
-  # Object validation
+  # Object validation - dispatcher
   defp validate_object(schema, path, definition, value) when is_map(value) do
     properties = Map.get(definition, "properties", %{})
     required = Map.get(definition, "required", [])
     nullable = Map.get(definition, "nullable", [])
 
-    result_value = value
-
     # Validate each property
-    result =
-      Enum.reduce_while(properties, {:ok, result_value}, fn {key, prop_def}, {:ok, acc_value} ->
-        key_value = Map.get(value, key)
-        is_required = key in required
-        is_nullable = key in nullable
-
-        cond do
-          # Null value for nullable field
-          is_nil(key_value) and is_nullable ->
-            {:cont, {:ok, acc_value}}
-
-          # Undefined value for non-required field
-          is_nil(key_value) and not is_required ->
-            # Check for default values
-            case get_default_value(prop_def) do
-              nil ->
-                {:cont, {:ok, acc_value}}
-
-              default ->
-                new_acc = Map.put(acc_value, key, default)
-                {:cont, {:ok, new_acc}}
-            end
-
-          # Value needs validation
-          true ->
-            prop_path = "#{path}/#{key}"
-
-            case validate_one_of(schema, prop_path, prop_def, key_value) do
-              {:ok, validated_value} ->
-                # Update value if it changed (e.g., defaults applied)
-                new_acc =
-                  if validated_value != key_value do
-                    Map.put(acc_value, key, validated_value)
-                  else
-                    acc_value
-                  end
-
-                {:cont, {:ok, new_acc}}
-
-              {:error, _} = error ->
-                # Check if it's a required field error
-                if is_nil(key_value) and is_required do
-                  {:halt, {:error, "#{path} must have the property \"#{key}\""}}
-                else
-                  {:halt, error}
-                end
-            end
-        end
-      end)
-
-    result
+    Enum.reduce_while(properties, {:ok, value}, fn {key, prop_def}, {:ok, acc_value} ->
+      validate_object_property(schema, path, key, prop_def, value, acc_value, required, nullable)
+    end)
   end
 
   defp validate_object(_schema, path, _definition, value) do
     {:error, "Expected object at #{path}, got #{inspect(value)}"}
   end
+
+  # Helper: Validate a single object property using pattern matching
+  defp validate_object_property(schema, path, key, prop_def, original_value, acc_value, required, nullable) do
+    key_value = Map.get(original_value, key)
+
+    # Build validation context
+    ctx = %{
+      schema: schema,
+      path: path,
+      key: key,
+      prop_def: prop_def,
+      value: key_value,
+      acc: acc_value,
+      required?: key in required,
+      nullable?: key in nullable
+    }
+
+    validate_property_value(ctx)
+  end
+
+  # Nil value for nullable property - skip validation
+  defp validate_property_value(%{value: nil, nullable?: true, acc: acc}) do
+    {:cont, {:ok, acc}}
+  end
+
+  # Nil value for optional (non-required) property - check for defaults
+  defp validate_property_value(%{value: nil, required?: false, key: key, prop_def: prop_def, acc: acc}) do
+    apply_default_value(key, prop_def, acc)
+  end
+
+  # Nil value for required property - will be caught during validation
+  defp validate_property_value(%{value: nil, required?: true} = ctx) do
+    %{schema: schema, path: path, key: key, prop_def: prop_def, acc: acc} = ctx
+    prop_path = "#{path}/#{key}"
+
+    case validate_one_of(schema, prop_path, prop_def, nil) do
+      {:ok, validated_value} ->
+        new_acc = update_if_changed(acc, key, nil, validated_value)
+        {:cont, {:ok, new_acc}}
+
+      {:error, _} ->
+        {:halt, {:error, "#{path} must have the property \"#{key}\""}}
+    end
+  end
+
+  # Non-nil value - validate it
+  defp validate_property_value(%{value: value} = ctx) when not is_nil(value) do
+    %{schema: schema, path: path, key: key, prop_def: prop_def, acc: acc} = ctx
+    prop_path = "#{path}/#{key}"
+
+    case validate_one_of(schema, prop_path, prop_def, value) do
+      {:ok, validated_value} ->
+        new_acc = update_if_changed(acc, key, value, validated_value)
+        {:cont, {:ok, new_acc}}
+
+      {:error, _} = error ->
+        {:halt, error}
+    end
+  end
+
+  # Helper: Apply default value if present
+  defp apply_default_value(key, prop_def, acc_value) do
+    case get_default_value(prop_def) do
+      nil -> {:cont, {:ok, acc_value}}
+      default -> {:cont, {:ok, Map.put(acc_value, key, default)}}
+    end
+  end
+
+  # Helper: Update accumulator only if value changed (guards for efficiency)
+  defp update_if_changed(acc_value, _key, original, validated) when original == validated,
+    do: acc_value
+  defp update_if_changed(acc_value, key, _original, validated),
+    do: Map.put(acc_value, key, validated)
 
   # Array validation
   defp validate_array(schema, path, definition, value) when is_list(value) do
