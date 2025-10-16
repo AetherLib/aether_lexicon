@@ -369,26 +369,46 @@ defmodule AetherLexicon.Validation do
     validate_by_type(schema, path, definition, value)
   end
 
-  # Route to appropriate validator based on type
-  defp validate_by_type(schema, path, definition, value) do
-    case definition["type"] do
-      "object" -> validate_object(schema, path, definition, value)
-      "array" -> validate_array(schema, path, definition, value)
-      "string" -> validate_string(path, definition, value)
-      "integer" -> validate_integer(path, definition, value)
-      "boolean" -> validate_boolean(path, definition, value)
-      "bytes" -> validate_bytes(path, definition, value)
-      "cid-link" -> validate_cid_link(path, value)
-      "unknown" -> validate_unknown(path, value)
-      "blob" -> validate_blob(path, value)
-      "token" -> validate_token(path, value)
-      "record" -> validate_record(schema, path, definition, value)
-      "query" -> validate_xrpc_io(schema, path, definition, value)
-      "procedure" -> validate_xrpc_io(schema, path, definition, value)
-      "subscription" -> validate_xrpc_io(schema, path, definition, value)
-      type -> {:error, "Unsupported type '#{type}' at #{path}"}
-    end
-  end
+  # Route to appropriate validator based on type using pattern matching
+  defp validate_by_type(schema, path, %{"type" => "object"} = definition, value),
+    do: validate_object(schema, path, definition, value)
+
+  defp validate_by_type(schema, path, %{"type" => "array"} = definition, value),
+    do: validate_array(schema, path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "string"} = definition, value),
+    do: validate_string(path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "integer"} = definition, value),
+    do: validate_integer(path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "boolean"} = definition, value),
+    do: validate_boolean(path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "bytes"} = definition, value),
+    do: validate_bytes(path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "cid-link"}, value),
+    do: validate_cid_link(path, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "unknown"}, value),
+    do: validate_unknown(path, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "blob"}, value),
+    do: validate_blob(path, value)
+
+  defp validate_by_type(_schema, path, %{"type" => "token"}, value),
+    do: validate_token(path, value)
+
+  defp validate_by_type(schema, path, %{"type" => "record"} = definition, value),
+    do: validate_record(schema, path, definition, value)
+
+  defp validate_by_type(schema, path, %{"type" => type} = definition, value)
+      when type in ["query", "procedure", "subscription"],
+    do: validate_xrpc_io(schema, path, definition, value)
+
+  defp validate_by_type(_schema, path, %{"type" => type}, _value),
+    do: {:error, "Unsupported type '#{type}' at #{path}"}
 
   # Object validation
   defp validate_object(schema, path, definition, value) when is_map(value) do
@@ -511,66 +531,128 @@ defmodule AetherLexicon.Validation do
     {:error, "#{path} must be a string, got #{inspect(value)}"}
   end
 
-  # String byte length validation (UTF-8 optimized like official implementation)
+  # String byte length validation (UTF-8 optimized like official implementation) - dispatcher
   defp validate_string_length(definition, value, path) do
-    min_length = definition["minLength"]
-    max_length = definition["maxLength"]
+    min_length = Map.get(definition, "minLength")
+    max_length = Map.get(definition, "maxLength")
 
-    if min_length || max_length do
-      # Optimization: JS string length * 3 is upper bound for UTF-8 byte length
-      string_length = String.length(value)
-
-      cond do
-        min_length && string_length * 3 < min_length ->
-          {:error, "#{path} must not be shorter than #{min_length} characters"}
-
-        max_length && min_length == nil && string_length * 3 <= max_length ->
-          # Can skip UTF-8 byte count
-          :ok
-
-        true ->
-          # Need to count actual UTF-8 bytes
-          byte_length = byte_size(value)
-
-          cond do
-            max_length && byte_length > max_length ->
-              {:error, "#{path} must not be longer than #{max_length} characters"}
-
-            min_length && byte_length < min_length ->
-              {:error, "#{path} must not be shorter than #{min_length} characters"}
-
-            true ->
-              :ok
-          end
-      end
-    else
-      :ok
-    end
+    validate_length_constraints(min_length, max_length, value, path)
   end
 
-  # String grapheme validation
+  # No length constraints
+  defp validate_length_constraints(nil, nil, _value, _path), do: :ok
+
+  # Both min and max length constraints
+  defp validate_length_constraints(min, max, value, path)
+      when not is_nil(min) and not is_nil(max) do
+    byte_length = byte_size(value)
+    validate_byte_range(byte_length, min, max, path)
+  end
+
+  # Only minimum length constraint
+  defp validate_length_constraints(min, nil, value, path) when not is_nil(min) do
+    string_length = String.length(value)
+    validate_min_byte_length(value, string_length, min, path)
+  end
+
+  # Only maximum length constraint (with UTF-8 optimization)
+  defp validate_length_constraints(nil, max, value, path) when not is_nil(max) do
+    string_length = String.length(value)
+    validate_max_byte_length(value, string_length, max, path)
+  end
+
+  # Fallback for unexpected cases
+  defp validate_length_constraints(_, _, _value, _path), do: :ok
+
+  # Validate byte length is within range using guards
+  defp validate_byte_range(length, _min, max, path) when length > max,
+    do: {:error, "#{path} must not be longer than #{max} characters"}
+  defp validate_byte_range(length, min, _max, path) when length < min,
+    do: {:error, "#{path} must not be shorter than #{min} characters"}
+  defp validate_byte_range(_length, _min, _max, _path), do: :ok
+
+  # Validate minimum byte length with UTF-8 optimization
+  # Fast path: if string_length * 3 < min, it's definitely too short
+  defp validate_min_byte_length(_value, string_length, min, path)
+      when string_length * 3 < min,
+    do: {:error, "#{path} must not be shorter than #{min} characters"}
+
+  # Slow path: need to check actual byte size
+  defp validate_min_byte_length(value, _string_length, min, path) do
+    byte_length = byte_size(value)
+    validate_min_bytes(byte_length, min, path)
+  end
+
+  defp validate_min_bytes(length, min, path) when length < min,
+    do: {:error, "#{path} must not be shorter than #{min} characters"}
+  defp validate_min_bytes(_length, _min, _path), do: :ok
+
+  # Validate maximum byte length with UTF-8 optimization
+  # Fast path: if string_length * 3 <= max, it's definitely ok
+  defp validate_max_byte_length(_value, string_length, max, _path)
+      when string_length * 3 <= max,
+    do: :ok
+
+  # Slow path: need to check actual byte size
+  defp validate_max_byte_length(value, _string_length, max, path) do
+    byte_length = byte_size(value)
+    validate_max_bytes(byte_length, max, path)
+  end
+
+  defp validate_max_bytes(length, max, path) when length > max,
+    do: {:error, "#{path} must not be longer than #{max} characters"}
+  defp validate_max_bytes(_length, _max, _path), do: :ok
+
+  # String grapheme validation - dispatcher
   defp validate_string_graphemes(definition, value, path) do
-    min_graphemes = definition["minGraphemes"]
-    max_graphemes = definition["maxGraphemes"]
+    min_graphemes = Map.get(definition, "minGraphemes")
+    max_graphemes = Map.get(definition, "maxGraphemes")
 
-    if min_graphemes || max_graphemes do
-      # In Elixir, String.length/1 returns grapheme count (not code units like JavaScript)
-      grapheme_length = String.length(value)
-
-      cond do
-        max_graphemes && grapheme_length > max_graphemes ->
-          {:error, "#{path} must not be longer than #{max_graphemes} graphemes"}
-
-        min_graphemes && grapheme_length < min_graphemes ->
-          {:error, "#{path} must not be shorter than #{min_graphemes} graphemes"}
-
-        true ->
-          :ok
-      end
-    else
-      :ok
-    end
+    validate_grapheme_constraints(min_graphemes, max_graphemes, value, path)
   end
+
+  # No grapheme constraints
+  defp validate_grapheme_constraints(nil, nil, _value, _path), do: :ok
+
+  # Both min and max grapheme constraints
+  defp validate_grapheme_constraints(min, max, value, path)
+      when not is_nil(min) and not is_nil(max) do
+    # In Elixir, String.length/1 returns grapheme count (not code units like JavaScript)
+    grapheme_length = String.length(value)
+    validate_grapheme_range(grapheme_length, min, max, path)
+  end
+
+  # Only minimum grapheme constraint
+  defp validate_grapheme_constraints(min, nil, value, path) when not is_nil(min) do
+    grapheme_length = String.length(value)
+    validate_min_graphemes(grapheme_length, min, path)
+  end
+
+  # Only maximum grapheme constraint
+  defp validate_grapheme_constraints(nil, max, value, path) when not is_nil(max) do
+    grapheme_length = String.length(value)
+    validate_max_graphemes(grapheme_length, max, path)
+  end
+
+  # Fallback for unexpected cases
+  defp validate_grapheme_constraints(_, _, _value, _path), do: :ok
+
+  # Validate grapheme count is within range using guards
+  defp validate_grapheme_range(length, min, _max, path) when length < min,
+    do: {:error, "#{path} must not be shorter than #{min} graphemes"}
+  defp validate_grapheme_range(length, _min, max, path) when length > max,
+    do: {:error, "#{path} must not be longer than #{max} graphemes"}
+  defp validate_grapheme_range(_length, _min, _max, _path), do: :ok
+
+  # Validate minimum grapheme count using guards
+  defp validate_min_graphemes(length, min, path) when length < min,
+    do: {:error, "#{path} must not be shorter than #{min} graphemes"}
+  defp validate_min_graphemes(_length, _min, _path), do: :ok
+
+  # Validate maximum grapheme count using guards
+  defp validate_max_graphemes(length, max, path) when length > max,
+    do: {:error, "#{path} must not be longer than #{max} graphemes"}
+  defp validate_max_graphemes(_length, _max, _path), do: :ok
 
   defp validate_string_format(%{"format" => format}, value, path),
     do: Formats.validate_format(format, value, path)
@@ -633,14 +715,18 @@ defmodule AetherLexicon.Validation do
   @cid_regex ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,})/
 
   defp validate_cid_link(path, value) when is_binary(value) do
-    if String.match?(value, @cid_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a CID"}
-    end
+    validate_with_regex(value, @cid_regex, path, " must be a CID")
   end
 
   defp validate_cid_link(path, _value), do: {:error, "#{path} must be a CID"}
+
+  # Helper: validate string against regex
+  defp validate_with_regex(value, regex, path, error_suffix) do
+    case String.match?(value, regex) do
+      true -> {:ok, value}
+      false -> {:error, "#{path}#{error_suffix}"}
+    end
+  end
 
   # Unknown type - accepts any object
   defp validate_unknown(_path, value) when is_map(value) do
@@ -654,13 +740,9 @@ defmodule AetherLexicon.Validation do
   # Blob validation - expects a map with blob structure
   defp validate_blob(_path, %{"$type" => "blob"} = value), do: {:ok, value}
 
-  defp validate_blob(path, value) when is_map(value) do
-    if Map.has_key?(value, "ref") and Map.has_key?(value, "mimeType") do
-      {:ok, value}
-    else
-      {:error, "#{path} should be a blob ref"}
-    end
-  end
+  defp validate_blob(_path, %{"ref" => _, "mimeType" => _} = value), do: {:ok, value}
+
+  defp validate_blob(path, %{}), do: {:error, "#{path} should be a blob ref"}
 
   defp validate_blob(path, _value), do: {:error, "#{path} should be a blob ref"}
 
@@ -782,58 +864,59 @@ defmodule AetherLexicon.Validation do
   end
 
   # Validate parameters (type: "params")
-  defp validate_params(schema, path, %{"type" => "params"} = params_def, value) do
+  defp validate_params(_schema, path, %{"type" => "params"}, value) when not is_map(value) do
+    {:error, "#{path} must be an object"}
+  end
+
+  defp validate_params(schema, path, %{"type" => "params"} = params_def, value) when is_map(value) do
     # Parameters are like objects with properties and required fields
     properties = Map.get(params_def, "properties", %{})
     required = Map.get(params_def, "required", [])
 
-    unless is_map(value) do
-      {:error, "#{path} must be an object"}
-    else
-      # Validate each parameter
-      Enum.reduce_while(properties, {:ok, value}, fn {key, prop_def}, {:ok, acc_value} ->
-        param_value = Map.get(value, key)
-        is_required = key in required
-
-        cond do
-          is_nil(param_value) and not is_required ->
-            # Check for defaults
-            case get_default_value(prop_def) do
-              nil ->
-                {:cont, {:ok, acc_value}}
-
-              default ->
-                new_acc = Map.put(acc_value, key, default)
-                {:cont, {:ok, new_acc}}
-            end
-
-          is_nil(param_value) and is_required ->
-            {:halt, {:error, "#{path} must have the parameter \"#{key}\""}}
-
-          true ->
-            param_path = "#{path}/#{key}"
-
-            case validate_one_of(schema, param_path, prop_def, param_value) do
-              {:ok, validated_value} ->
-                new_acc =
-                  if validated_value != param_value do
-                    Map.put(acc_value, key, validated_value)
-                  else
-                    acc_value
-                  end
-
-                {:cont, {:ok, new_acc}}
-
-              {:error, _} = error ->
-                {:halt, error}
-            end
-        end
-      end)
-    end
+    # Validate each parameter
+    Enum.reduce_while(properties, {:ok, value}, fn {key, prop_def}, {:ok, acc_value} ->
+      validate_param_property(schema, path, key, prop_def, acc_value, key in required)
+    end)
   end
 
   defp validate_params(_schema, path, _params_def, _value) do
     {:error, "#{path} invalid parameters definition"}
+  end
+
+  # Helper: Validate a single parameter property
+  defp validate_param_property(schema, path, key, prop_def, acc_value, is_required) do
+    param_value = Map.get(acc_value, key)
+
+    case {is_nil(param_value), is_required} do
+      {true, false} ->
+        # Optional parameter - check for defaults
+        case get_default_value(prop_def) do
+          nil -> {:cont, {:ok, acc_value}}
+          default -> {:cont, {:ok, Map.put(acc_value, key, default)}}
+        end
+
+      {true, true} ->
+        # Required parameter missing
+        {:halt, {:error, "#{path} must have the parameter \"#{key}\""}}
+
+      {false, _} ->
+        # Validate the parameter value
+        param_path = "#{path}/#{key}"
+
+        case validate_one_of(schema, param_path, prop_def, param_value) do
+          {:ok, validated_value} ->
+            new_acc =
+              case validated_value != param_value do
+                true -> Map.put(acc_value, key, validated_value)
+                false -> acc_value
+              end
+
+            {:cont, {:ok, new_acc}}
+
+          {:error, _} = error ->
+            {:halt, error}
+        end
+    end
   end
 
   # Helper: Get default value from definition

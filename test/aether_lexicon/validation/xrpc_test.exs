@@ -545,4 +545,221 @@ defmodule AetherLexicon.Validation.XrpcTest do
       assert result["did"] == "did:plc:xyz789"
     end
   end
+
+  describe "xrpc edge cases for coverage" do
+    test "validates query without parameters definition" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.noParams",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "output" => %{
+              "schema" => %{
+                "type" => "object",
+                "properties" => %{"value" => %{"type" => "string"}}
+              }
+            }
+          }
+        }
+      }
+
+      # Should succeed even with parameters data when no parameters schema defined
+      assert {:ok, _} = Validation.validate_parameters(schema, "main", %{"anything" => "goes"})
+    end
+
+    test "validates query with nil input definition using validate_input" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.noInput",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "output" => %{
+              "schema" => %{
+                "type" => "object",
+                "properties" => %{"value" => %{"type" => "string"}}
+              }
+            }
+          }
+        }
+      }
+
+      # Should succeed when no input schema defined
+      assert {:ok, _} = Validation.validate_input(schema, "main", %{"anything" => "goes"})
+    end
+
+    test "validates input with direct schema (without schema wrapper)" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.directSchema",
+        "defs" => %{
+          "main" => %{
+            "type" => "procedure",
+            "input" => %{
+              "type" => "object",
+              "required" => ["action"],
+              "properties" => %{
+                "action" => %{"type" => "string"}
+              }
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = Validation.validate_input(schema, "main", %{"action" => "create"})
+      assert result["action"] == "create"
+    end
+
+    test "validates output with direct schema (without schema wrapper)" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.directOutputSchema",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "output" => %{
+              "type" => "object",
+              "required" => ["status"],
+              "properties" => %{
+                "status" => %{"type" => "string"}
+              }
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = Validation.validate_output(schema, "main", %{"status" => "ok"})
+      assert result["status"] == "ok"
+    end
+
+    test "validates subscription without message definition" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.simpleSubscription",
+        "defs" => %{
+          "main" => %{
+            "type" => "subscription",
+            "parameters" => %{
+              "type" => "params",
+              "properties" => %{
+                "cursor" => %{"type" => "integer"}
+              }
+            }
+          }
+        }
+      }
+
+      # Should succeed even with message data when no message schema defined
+      assert {:ok, _} = Validation.validate_message(schema, "main", %{"anything" => "goes"})
+    end
+
+    test "validates array without items definition" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.arrayNoItems",
+        "defs" => %{
+          "main" => %{
+            "type" => "object",
+            "properties" => %{
+              "tags" => %{
+                "type" => "array"
+                # No items definition
+              }
+            }
+          }
+        }
+      }
+
+      # Should succeed with any array content when no items schema defined
+      assert {:ok, result} = Validation.validate(schema, "main", %{"tags" => [1, "two", %{"three" => 3}]})
+      assert result["tags"] == [1, "two", %{"three" => 3}]
+    end
+
+    test "validates message with direct schema (without schema wrapper)" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.directMessageSchema",
+        "defs" => %{
+          "main" => %{
+            "type" => "subscription",
+            "message" => %{
+              "type" => "object",
+              "required" => ["event"],
+              "properties" => %{
+                "event" => %{"type" => "string"}
+              }
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = Validation.validate_message(schema, "main", %{"event" => "update"})
+      assert result["event"] == "update"
+    end
+
+    test "rejects error validation when endpoint has no errors defined" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.noErrors",
+        "defs" => %{
+          "main" => %{
+            "type" => "procedure",
+            "input" => %{
+              "schema" => %{
+                "type" => "object",
+                "properties" => %{"action" => %{"type" => "string"}}
+              }
+            }
+          }
+        }
+      }
+
+      # Should fail when trying to validate error but no errors are defined
+      assert {:error, error} = Validation.validate_error(schema, "main", "SomeError", %{})
+      assert error =~ "has no errors defined"
+    end
+
+    test "validates with direct input schema using default validate function" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.directInputDefault",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "input" => %{
+              "type" => "object",
+              "required" => ["key"],
+              "properties" => %{
+                "key" => %{"type" => "string"}
+              }
+            }
+          }
+        }
+      }
+
+      # Using validate/3 defaults to input validation and should use direct schema
+      assert {:ok, result} = Validation.validate(schema, "main", %{"key" => "value"})
+      assert result["key"] == "value"
+    end
+
+    test "rejects invalid parameters definition" do
+      # Test parameters that aren't type "params"
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.wrongParamsType",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "parameters" => %{
+              "type" => "string"  # Wrong type, should be "params"
+            }
+          }
+        }
+      }
+
+      assert {:error, error} = Validation.validate_parameters(schema, "main", %{"q" => "test"})
+      assert error =~ "invalid parameters definition"
+    end
+  end
 end

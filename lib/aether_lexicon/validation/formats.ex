@@ -38,6 +38,18 @@ defmodule AetherLexicon.Validation.Formats do
       #=> {:ok, "did:plc:abc123xyz"}
   """
 
+  # Regex patterns defined as module attributes
+  @iso8601_regex ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?$/
+  @uri_regex ~r/^\w+:(?:\/\/)?[^\s\/][^\s]*$/
+  @at_uri_regex ~r/^at:\/\/[a-zA-Z0-9:._-]+\/[a-z][a-z0-9.-]*\.[a-z][a-z0-9.-]*[a-z]\/[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/
+  @did_regex ~r/^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$/
+  @handle_regex ~r/^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/
+  @nsid_regex ~r/^[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?:\.[a-zA-Z](?:[a-zA-Z0-9]{0,62})?)$/
+  @cid_regex ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,}|[a-z0-9]{59,})$/
+  @language_regex ~r/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?(-[a-zA-Z0-9]{5,8})*(-[a-zA-Z0-9]{1,8})*$/
+  @tid_regex ~r/^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/
+  @record_key_regex ~r/^[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/
+
   @doc """
   Validates a value against a specific format type.
 
@@ -57,22 +69,18 @@ defmodule AetherLexicon.Validation.Formats do
   """
   @spec validate_format(String.t(), String.t(), String.t()) ::
           {:ok, String.t()} | {:error, String.t()}
-  def validate_format(format, value, path) do
-    case format do
-      "datetime" -> datetime(path, value)
-      "uri" -> uri(path, value)
-      "at-uri" -> at_uri(path, value)
-      "did" -> did(path, value)
-      "handle" -> handle(path, value)
-      "at-identifier" -> at_identifier(path, value)
-      "nsid" -> nsid(path, value)
-      "cid" -> cid(path, value)
-      "language" -> language(path, value)
-      "tid" -> tid(path, value)
-      "record-key" -> record_key(path, value)
-      _ -> {:ok, value}
-    end
-  end
+  def validate_format("datetime", value, path), do: datetime(path, value)
+  def validate_format("uri", value, path), do: uri(path, value)
+  def validate_format("at-uri", value, path), do: at_uri(path, value)
+  def validate_format("did", value, path), do: did(path, value)
+  def validate_format("handle", value, path), do: handle(path, value)
+  def validate_format("at-identifier", value, path), do: at_identifier(path, value)
+  def validate_format("nsid", value, path), do: nsid(path, value)
+  def validate_format("cid", value, path), do: cid(path, value)
+  def validate_format("language", value, path), do: language(path, value)
+  def validate_format("tid", value, path), do: tid(path, value)
+  def validate_format("record-key", value, path), do: record_key(path, value)
+  def validate_format(_unknown_format, value, _path), do: {:ok, value}
 
   @doc """
   Validates an ISO 8601 / RFC 3339 datetime string.
@@ -93,44 +101,8 @@ defmodule AetherLexicon.Validation.Formats do
   """
   @spec datetime(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def datetime(path, value) do
-    # Basic ISO 8601 format check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|[+-]HH:MM)?
-    iso8601_regex =
-      ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?$/
-
-    if String.match?(value, iso8601_regex) do
-      {:ok, value}
-    else
-      {:error,
-       "#{path} must be an valid atproto datetime (both RFC-3339 and ISO-8601)"}
-    end
-  end
-
-  # Generic URI format validation
-  def uri(path, value) do
-    # Pattern: scheme:path where scheme is alphanumeric and path is non-empty
-    uri_regex = ~r/^\w+:(?:\/\/)?[^\s\/][^\s]*$/
-
-    if String.match?(value, uri_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a uri"}
-    end
-  end
-
-  # AT Protocol URI validation (at://did:plc:xxx/collection/rkey)
-  def at_uri(path, value) do
-    # at://authority/collection/rkey
-    # authority can be DID or handle
-    # collection is NSID format
-    # rkey is alphanumeric with some special chars
-    at_uri_regex =
-      ~r/^at:\/\/[a-zA-Z0-9:._-]+\/[a-z][a-z0-9.-]*\.[a-z][a-z0-9.-]*[a-z]\/[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/
-
-    if String.match?(value, at_uri_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a valid at-uri"}
-    end
+    validate_with_regex(value, @iso8601_regex, path,
+      "must be an valid atproto datetime (both RFC-3339 and ISO-8601)")
   end
 
   @doc """
@@ -155,15 +127,7 @@ defmodule AetherLexicon.Validation.Formats do
   """
   @spec did(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def did(path, value) do
-    # did:method:identifier format
-    # Common methods: plc, web, key
-    did_regex = ~r/^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$/
-
-    if String.match?(value, did_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a valid did"}
-    end
+    validate_with_regex(value, @did_regex, path, "must be a valid did")
   end
 
   @doc """
@@ -187,37 +151,12 @@ defmodule AetherLexicon.Validation.Formats do
       #=> {:error, "/handle must be a valid handle"}
   """
   @spec handle(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def handle(path, value) do
-    # Domain name format: labels separated by dots
-    # Each label starts with alphanumeric, can contain hyphens
-    handle_regex = ~r/^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/
-
-    cond do
-      String.length(value) > 253 ->
-        {:error, "#{path} must be a valid handle"}
-
-      String.match?(value, handle_regex) ->
-        {:ok, value}
-
-      true ->
-        {:error, "#{path} must be a valid handle"}
-    end
+  def handle(path, value) when byte_size(value) > 253 do
+    {:error, "#{path} must be a valid handle"}
   end
 
-  # AT Identifier (DID or Handle)
-  def at_identifier(path, value) do
-    # Try DID first if it starts with "did:"
-    if String.starts_with?(value, "did:") do
-      case did(path, value) do
-        {:ok, _} = result -> result
-        {:error, _} -> {:error, "#{path} must be a valid did or a handle"}
-      end
-    else
-      case handle(path, value) do
-        {:ok, _} = result -> result
-        {:error, _} -> {:error, "#{path} must be a valid did or a handle"}
-      end
-    end
+  def handle(path, value) do
+    validate_with_regex(value, @handle_regex, path, "must be a valid handle")
   end
 
   @doc """
@@ -238,81 +177,74 @@ defmodule AetherLexicon.Validation.Formats do
       #=> {:error, "/lexicon must be a valid nsid"}
   """
   @spec nsid(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def nsid(path, value) when byte_size(value) > 317 do
+    {:error, "#{path} must be a valid nsid"}
+  end
+
   def nsid(path, value) do
-    # Format: reversed domain notation like com.example.type or com.atproto.server.createSession
-    # Minimum 3 segments, alphanumeric (both cases) with hyphens and dots
-    # Based on: /^[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?:\.[a-zA-Z](?:[a-zA-Z0-9]{0,62})?)$/
-    nsid_regex =
-      ~r/^[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?:\.[a-zA-Z](?:[a-zA-Z0-9]{0,62})?)$/
+    validate_with_regex(value, @nsid_regex, path, "must be a valid nsid")
+  end
 
-    cond do
-      String.length(value) > 317 ->
-        {:error, "#{path} must be a valid nsid"}
+  # Generic URI format validation
+  def uri(path, value) do
+    validate_with_regex(value, @uri_regex, path, "must be a uri")
+  end
 
-      String.match?(value, nsid_regex) ->
-        {:ok, value}
+  # AT Protocol URI validation (at://did:plc:xxx/collection/rkey)
+  def at_uri(path, value) do
+    validate_with_regex(value, @at_uri_regex, path, "must be a valid at-uri")
+  end
 
-      true ->
-        {:error, "#{path} must be a valid nsid"}
-    end
+  # AT Identifier (DID or Handle)
+  def at_identifier(path, "did:" <> _ = value) do
+    validate_did_or_handle(path, value, &did/2)
+  end
+
+  def at_identifier(path, value) do
+    validate_did_or_handle(path, value, &handle/2)
   end
 
   # CID (Content Identifier) validation
   def cid(path, value) do
-    # CIDv0: Qm followed by 44 base58 characters
-    # CIDv1: base32 or base58 encoded, typically starts with 'b' for base32
-    cid_regex = ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,}|[a-z0-9]{59,})$/
-
-    if String.match?(value, cid_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a cid string"}
-    end
+    validate_with_regex(value, @cid_regex, path, "must be a cid string")
   end
 
   # BCP 47 language tag validation
   def language(path, value) do
-    # Basic BCP 47 format: 2-3 letter language code, optional script, region, variants
-    # Examples: en, en-US, zh-Hans-CN, pt-BR
-    language_regex =
-      ~r/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?(-[a-zA-Z0-9]{5,8})*(-[a-zA-Z0-9]{1,8})*$/
-
-    if String.match?(value, language_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a well-formed BCP 47 language tag"}
-    end
+    validate_with_regex(value, @language_regex, path, "must be a well-formed BCP 47 language tag")
   end
 
   # TID (Timestamp ID) validation
   def tid(path, value) do
-    # TID format: 13 character base32-sortable timestamp
-    # Contains only specific base32 characters (2-7, a-z)
-    tid_regex = ~r/^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/
-
-    if String.match?(value, tid_regex) do
-      {:ok, value}
-    else
-      {:error, "#{path} must be a valid TID"}
-    end
+    validate_with_regex(value, @tid_regex, path, "must be a valid TID")
   end
 
   # Record Key validation
+  def record_key(path, value) when byte_size(value) > 512 do
+    {:error, "#{path} must be a valid Record Key"}
+  end
+
+  def record_key(path, value) when byte_size(value) == 0 do
+    {:error, "#{path} must be a valid Record Key"}
+  end
+
   def record_key(path, value) do
-    # Record keys: alphanumeric, dots, dashes, underscores, tildes, colons
-    # Length constraints and character restrictions
-    cond do
-      String.length(value) > 512 ->
-        {:error, "#{path} must be a valid Record Key"}
+    validate_with_regex(value, @record_key_regex, path, "must be a valid Record Key")
+  end
 
-      String.length(value) == 0 ->
-        {:error, "#{path} must be a valid Record Key"}
+  # Helper: Validate string against regex pattern
+  defp validate_with_regex(value, regex, path, error_suffix) do
+    case String.match?(value, regex) do
+      true -> {:ok, value}
+      false -> {:error, "#{path} #{error_suffix}"}
+    end
+  end
 
-      String.match?(value, ~r/^[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/) ->
-        {:ok, value}
-
-      true ->
-        {:error, "#{path} must be a valid Record Key"}
+  # Helper: Validate DID or handle with fallback error message
+  defp validate_did_or_handle(path, value, validator_fun) do
+    case validator_fun.(path, value) do
+      {:ok, _} = result -> result
+      {:error, _} -> {:error, "#{path} must be a valid did or a handle"}
     end
   end
 end
