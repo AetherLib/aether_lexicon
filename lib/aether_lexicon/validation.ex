@@ -4,12 +4,14 @@ defmodule AetherLexicon.Validation do
 
   This module provides comprehensive validation for ATProto lexicon schemas,
   supporting all lexicon types including objects, arrays, strings, integers,
-  booleans, refs, unions, and more.
+  booleans, refs, unions, and XRPC endpoints.
 
   The implementation matches the behavior of the official JavaScript implementation,
   ensuring compatibility with the ATProto specification.
 
   ## Supported Types
+
+  ### Data Types
 
     * `:object` - Structured data with properties, required fields, and defaults
     * `:array` - Lists with optional item type constraints
@@ -21,13 +23,33 @@ defmodule AetherLexicon.Validation do
     * `:union` - One of several possible types
     * `:cid-link` - Content identifiers
     * `:blob` - Binary large objects
-    * `:token` - Authentication tokens
-    * `:record` - Record types
     * `:unknown` - Untyped data
+
+  ### Lexicon Types
+
+    * `:record` - Repository record schemas
+    * `:token` - Authentication tokens
+    * `:query` - XRPC read-only endpoints (GET)
+    * `:procedure` - XRPC write endpoints (POST)
+    * `:subscription` - XRPC streaming endpoints (WebSocket)
+
+  ## XRPC Endpoint Validation
+
+  For XRPC endpoint types (query, procedure, subscription), use the dedicated
+  validation functions to validate different parts of the endpoint:
+
+    * `validate_input/3` - Validates request body against input schema
+    * `validate_output/3` - Validates response body against output schema
+    * `validate_parameters/3` - Validates URL/query parameters
+    * `validate_message/3` - Validates subscription message (WebSocket)
+    * `validate_error/4` - Validates named error response
+
+  The general `validate/3` function works for all schema types and defaults to
+  validating input for XRPC endpoints.
 
   ## Examples
 
-      # Load a schema
+      # Validating a record
       schema = %{
         "lexicon" => 1,
         "id" => "com.example.post",
@@ -71,8 +93,24 @@ defmodule AetherLexicon.Validation do
   Takes a schema map, a definition name, and data to validate. Returns the
   validated data (potentially with defaults applied) or an error message.
 
+  This is the general-purpose validation function that works for all schema types.
+  For XRPC endpoints, consider using the dedicated functions (`validate_input/3`,
+  `validate_output/3`, etc.) for more explicit validation.
+
+  ## Parameters
+
+    * `schema` - The lexicon schema map
+    * `def_name` - The definition name to validate against (e.g., "main", "label")
+    * `data` - The data to validate
+
+  ## Returns
+
+    * `{:ok, validated_data}` - Validation succeeded, returns data with defaults applied
+    * `{:error, message}` - Validation failed with an error message
+
   ## Examples
 
+      # Validating a record schema
       schema = %{
         "lexicon" => 1,
         "id" => "com.example.label",
@@ -93,8 +131,8 @@ defmodule AetherLexicon.Validation do
       validate(schema, "label", %{})
       #=> {:error, "label must have the property \\"val\\""}
 
-      validate(schema, "nonexistent", %{})
-      #=> {:error, "Definition 'nonexistent' not found in schema"}
+      # For XRPC endpoints, use dedicated functions:
+      # validate_input/3, validate_output/3, validate_parameters/3, etc.
   """
   @spec validate(map(), String.t(), any()) :: validation_result()
   def validate(schema, def_name, data) do
@@ -105,6 +143,175 @@ defmodule AetherLexicon.Validation do
       {:error, _} = error ->
         error
     end
+  end
+
+  @doc """
+  Validates XRPC input data (request body) against a schema.
+
+  For XRPC endpoints (query, procedure), this validates the data sent in the
+  request body against the `input` schema definition.
+
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.createPost",
+        "defs" => %{
+          "main" => %{
+            "type" => "procedure",
+            "input" => %{
+              "schema" => %{
+                "type" => "object",
+                "required" => ["text"],
+                "properties" => %{"text" => %{"type" => "string", "maxLength" => 300}}
+              }
+            }
+          }
+        }
+      }
+
+      validate_input(schema, "main", %{"text" => "Hello world!"})
+      #=> {:ok, %{"text" => "Hello world!"}}
+  """
+  @spec validate_input(map(), String.t(), map()) :: validation_result()
+  def validate_input(schema, def_name, data) when is_map(data) do
+    validate(schema, def_name, Map.put(data, "$xrpc", "input"))
+  end
+
+  @doc """
+  Validates XRPC output data (response body) against a schema.
+
+  For XRPC endpoints (query, procedure), this validates the data returned in the
+  response body against the `output` schema definition.
+
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.getPost",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "output" => %{
+              "schema" => %{
+                "type" => "object",
+                "required" => ["post"],
+                "properties" => %{"post" => %{"type" => "object"}}
+              }
+            }
+          }
+        }
+      }
+
+      validate_output(schema, "main", %{"post" => %{"text" => "Hello"}})
+      #=> {:ok, %{"post" => %{"text" => "Hello"}}}
+  """
+  @spec validate_output(map(), String.t(), map()) :: validation_result()
+  def validate_output(schema, def_name, data) when is_map(data) do
+    validate(schema, def_name, Map.put(data, "$xrpc", "output"))
+  end
+
+  @doc """
+  Validates XRPC parameters (URL/query string parameters) against a schema.
+
+  For XRPC endpoints, this validates query string parameters against the
+  `parameters` schema definition.
+
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.search",
+        "defs" => %{
+          "main" => %{
+            "type" => "query",
+            "parameters" => %{
+              "type" => "params",
+              "required" => ["q"],
+              "properties" => %{
+                "q" => %{"type" => "string"},
+                "limit" => %{"type" => "integer", "default" => 25}
+              }
+            }
+          }
+        }
+      }
+
+      validate_parameters(schema, "main", %{"q" => "test"})
+      #=> {:ok, %{"q" => "test", "limit" => 25}}
+  """
+  @spec validate_parameters(map(), String.t(), map()) :: validation_result()
+  def validate_parameters(schema, def_name, data) when is_map(data) do
+    validate(schema, def_name, Map.put(data, "$xrpc", "parameters"))
+  end
+
+  @doc """
+  Validates XRPC subscription message against a schema.
+
+  For subscription endpoints, this validates WebSocket messages against the
+  `message` schema definition.
+
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.subscribe",
+        "defs" => %{
+          "main" => %{
+            "type" => "subscription",
+            "message" => %{
+              "schema" => %{
+                "type" => "object",
+                "required" => ["seq"],
+                "properties" => %{"seq" => %{"type" => "integer"}}
+              }
+            }
+          }
+        }
+      }
+
+      validate_message(schema, "main", %{"seq" => 12345})
+      #=> {:ok, %{"seq" => 12345}}
+  """
+  @spec validate_message(map(), String.t(), map()) :: validation_result()
+  def validate_message(schema, def_name, data) when is_map(data) do
+    validate(schema, def_name, Map.put(data, "$xrpc", "message"))
+  end
+
+  @doc """
+  Validates XRPC error response against a schema.
+
+  For XRPC endpoints, this validates error responses against the named error
+  definition in the `errors` list.
+
+  ## Examples
+
+      schema = %{
+        "lexicon" => 1,
+        "id" => "com.example.auth",
+        "defs" => %{
+          "main" => %{
+            "type" => "procedure",
+            "errors" => [
+              %{
+                "name" => "InvalidCredentials",
+                "schema" => %{
+                  "type" => "object",
+                  "required" => ["message"],
+                  "properties" => %{"message" => %{"type" => "string"}}
+                }
+              }
+            ]
+          }
+        }
+      }
+
+      validate_error(schema, "main", "InvalidCredentials", %{"message" => "Wrong password"})
+      #=> {:ok, %{"message" => "Wrong password"}}
+  """
+  @spec validate_error(map(), String.t(), String.t(), map()) :: validation_result()
+  def validate_error(schema, def_name, error_name, data) when is_map(data) do
+    validate(schema, def_name, Map.merge(data, %{"$xrpc" => "error", "$error" => error_name}))
   end
 
   # Get a specific definition from the schema
@@ -176,6 +383,9 @@ defmodule AetherLexicon.Validation do
       "blob" -> validate_blob(path, value)
       "token" -> validate_token(path, value)
       "record" -> validate_record(schema, path, definition, value)
+      "query" -> validate_xrpc_io(schema, path, definition, value)
+      "procedure" -> validate_xrpc_io(schema, path, definition, value)
+      "subscription" -> validate_xrpc_io(schema, path, definition, value)
       type -> {:error, "Unsupported type '#{type}' at #{path}"}
     end
   end
@@ -465,6 +675,166 @@ defmodule AetherLexicon.Validation do
 
   defp validate_record(_schema, path, _definition, _value),
     do: {:error, "Invalid record definition at #{path}"}
+
+  # XRPC endpoint validation (query, procedure, subscription)
+  # Validates different parts of XRPC schemas based on $xrpc marker
+
+  # Validate parameters (query string params)
+  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "parameters"} = data) do
+    case definition["parameters"] do
+      nil ->
+        {:ok, data}
+
+      params_def ->
+        actual_data = Map.delete(data, "$xrpc")
+        # Parameters have type "params" but are validated like objects
+        validate_params(schema, "#{path}/parameters", params_def, actual_data)
+    end
+  end
+
+  # Validate input
+  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "input"} = data) do
+    case definition["input"] do
+      nil ->
+        {:ok, data}
+
+      %{"schema" => input_schema} ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/input", input_schema, actual_data)
+
+      input_schema ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/input", input_schema, actual_data)
+    end
+  end
+
+  # Validate output
+  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "output"} = data) do
+    case definition["output"] do
+      nil ->
+        {:ok, data}
+
+      %{"schema" => output_schema} ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/output", output_schema, actual_data)
+
+      output_schema ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/output", output_schema, actual_data)
+    end
+  end
+
+  # Validate message (for subscriptions)
+  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "message"} = data) do
+    case definition["message"] do
+      nil ->
+        {:ok, data}
+
+      %{"schema" => message_schema} ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/message", message_schema, actual_data)
+
+      message_schema ->
+        actual_data = Map.delete(data, "$xrpc")
+        validate_one_of(schema, "#{path}/message", message_schema, actual_data)
+    end
+  end
+
+  # Validate errors (named error responses)
+  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "error", "$error" => error_name} = data) do
+    case definition["errors"] do
+      nil ->
+        {:error, "#{path} has no errors defined"}
+
+      errors when is_list(errors) ->
+        actual_data = data |> Map.delete("$xrpc") |> Map.delete("$error")
+
+        # Find the named error
+        error_def = Enum.find(errors, fn err -> err["name"] == error_name end)
+
+        case error_def do
+          nil ->
+            available = Enum.map(errors, & &1["name"]) |> Enum.join(", ")
+            {:error, "#{path} unknown error '#{error_name}', available: #{available}"}
+
+          %{"schema" => error_schema} ->
+            validate_one_of(schema, "#{path}/errors/#{error_name}", error_schema, actual_data)
+
+          _error_without_schema ->
+            # Error defined but no schema - accept any data
+            {:ok, actual_data}
+        end
+    end
+  end
+
+  # Default: validate against input schema
+  defp validate_xrpc_io(schema, path, definition, value) do
+    case definition["input"] do
+      nil ->
+        {:ok, value}
+
+      %{"schema" => input_schema} ->
+        validate_one_of(schema, "#{path}/input", input_schema, value)
+
+      input_schema ->
+        validate_one_of(schema, "#{path}/input", input_schema, value)
+    end
+  end
+
+  # Validate parameters (type: "params")
+  defp validate_params(schema, path, %{"type" => "params"} = params_def, value) do
+    # Parameters are like objects with properties and required fields
+    properties = Map.get(params_def, "properties", %{})
+    required = Map.get(params_def, "required", [])
+
+    unless is_map(value) do
+      {:error, "#{path} must be an object"}
+    else
+      # Validate each parameter
+      Enum.reduce_while(properties, {:ok, value}, fn {key, prop_def}, {:ok, acc_value} ->
+        param_value = Map.get(value, key)
+        is_required = key in required
+
+        cond do
+          is_nil(param_value) and not is_required ->
+            # Check for defaults
+            case get_default_value(prop_def) do
+              nil ->
+                {:cont, {:ok, acc_value}}
+
+              default ->
+                new_acc = Map.put(acc_value, key, default)
+                {:cont, {:ok, new_acc}}
+            end
+
+          is_nil(param_value) and is_required ->
+            {:halt, {:error, "#{path} must have the parameter \"#{key}\""}}
+
+          true ->
+            param_path = "#{path}/#{key}"
+
+            case validate_one_of(schema, param_path, prop_def, param_value) do
+              {:ok, validated_value} ->
+                new_acc =
+                  if validated_value != param_value do
+                    Map.put(acc_value, key, validated_value)
+                  else
+                    acc_value
+                  end
+
+                {:cont, {:ok, new_acc}}
+
+              {:error, _} = error ->
+                {:halt, error}
+            end
+        end
+      end)
+    end
+  end
+
+  defp validate_params(_schema, path, _params_def, _value) do
+    {:error, "#{path} invalid parameters definition"}
+  end
 
   # Helper: Get default value from definition
   defp get_default_value(%{"type" => type, "default" => default}),
