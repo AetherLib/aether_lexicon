@@ -1,8 +1,5 @@
 # AetherLexicon
-
-[![Coverage](https://img.shields.io/badge/coverage-99.38%25-brightgreen.svg)](https://github.com/your-org/aether_lexicon)
-
-A comprehensive ATProto Lexicon validation library for Elixir, providing complete validation for AT Protocol schemas and data.
+ATProto Lexicon in for Elixir.
 
 ## Features
 
@@ -12,7 +9,6 @@ A comprehensive ATProto Lexicon validation library for Elixir, providing complet
 - ✅ **Cross-schema references** - Full support for refs and unions across schemas
 - ✅ **Comprehensive constraint validation** - min/max, length, enum, const, required, nullable
 - ✅ **Functional API** - Simple, stateless validation functions
-- ✅ **99.38% test coverage** - Extensively tested with 550+ test cases
 
 ## Installation
 
