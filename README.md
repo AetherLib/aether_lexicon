@@ -3,12 +3,11 @@ ATProto Lexicon in for Elixir.
 
 ## Validation Features:
 
-- ✅ **Complete ATProto validation** - All primitive types, complex types, IPLD types, and XRPC endpoints
-- ✅ **String format validation** - datetime, URI, DID, handle, NSID, CID, language tags, and more
-- ✅ **XRPC endpoint support** - Validate query parameters, request/response bodies, subscriptions, and errors
-- ✅ **Cross-schema references** - Full support for refs and unions across schemas
-- ✅ **Comprehensive constraint validation** - min/max, length, enum, const, required, nullable
-- ✅ **Functional API** - Simple, stateless validation functions
+- **Complete ATProto validation** - All primitive types, complex types, IPLD types, and XRPC endpoints
+- **String format validation** - datetime, URI, DID, handle, NSID, CID, language tags, and more
+- **XRPC endpoint support** - Validate query parameters, request/response bodies, subscriptions, and errors
+- **Cross-schema references** - Full support for refs and unions across schemas
+- **Comprehensive constraint validation** - min/max, length, enum, const, required, nullable
 
 ## Installation
 
@@ -17,7 +16,7 @@ Add `aether_lexicon` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:aether_lexicon, "~> 0.1.0"}
+    {:aether_lexicon, "~> 0.1.1"}
   ]
 end
 ```
