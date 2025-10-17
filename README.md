@@ -28,7 +28,7 @@ end
 ### Basic Validation
 
 ```elixir
-alias AetherLexicon.Validation
+alias Aether.ATProto.Lexicon.Validation
 
 # Define a schema
 schema = %{

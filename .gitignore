@@ -23,3 +23,5 @@ aether_lexicon-*.tar
 /tmp/
 
 /.elixir_ls/
+
+session

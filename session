@@ -1,0 +1,1712 @@
+> I want to create a registry for my lexicons so that once they are loaded via their json files they can stay in memory and be used for validations and discovery in other systems. Since I see validation as something I expect to be used frequently I
+want to ensure I dont have to load the schema everytime. Also because I assume using the registry for discovery of xrpc endpoints will be frequent I want that for the same reasons too. This also how the offical js version does this. Offical source
+repo can be found locally at `/home/josh/Dev/aether/bsky/atproto/`. Lets model our interface after the same functions
+
+● I'll help you create a lexicon registry for caching and discovery. Let me start by exploring the official JS implementation to understand the interface, then design and implement a similar solution for your Elixir project.
+
+● Explore(Find JS lexicon registry)
+  ⎿  Done (18 tool uses · 56.1k tokens · 1m 35s)
+
+● Excellent! I now have a comprehensive understanding of the JS implementation. Let me review your current Elixir codebase structure to see what already exists.
+
+● Search(pattern: "**/*.ex")
+  ⎿  Found 100 files (ctrl+o to expand)
+
+● Read(mix.exs)
+  ⎿  Read 98 lines
+
+● Search(pattern: "lib/**/*.ex")
+  ⎿  Found 2 files (ctrl+o to expand)
+
+● Read(lib/aether_lexicon.ex)
+  ⎿  Read 94 lines
+
+● Read(lib/aether_lexicon/validation.ex)
+  ⎿  Read 1187 lines
+
+● Search(pattern: "test/**/*_test.exs")
+  ⎿  Found 1 file (ctrl+o to expand)
+
+● Read(README.md)
+  ⎿  Read 207 lines
+
+● Perfect! Now I understand the current structure. Let me design the registry module interface based on the JS implementation.
+
+● Based on my exploration of the JS implementation and your current codebase, here's my design for the registry:
+
+  Registry Design
+
+  The registry will be a struct-based approach (idiomatic Elixir) with two-level caching:
+  1. Full documents - docs: %{uri => lexicon_doc}
+  2. Individual definitions - defs: %{uri => definition} for O(1) lookups
+
+  Interface (matching JS Lexicons class):
+
+  # Core Functions
+  Registry.new(schemas \\ [])                    # Create registry with optional schemas
+  Registry.add(registry, lexicon_doc)            # Add lexicon, returns updated registry
+  Registry.remove(registry, uri)                 # Remove lexicon
+  Registry.get(registry, uri)                    # Get full document
+  Registry.get_def(registry, uri)                # Get specific definition
+  Registry.list(registry)                        # List all URIs
+
+  # Validation Functions (using cached schemas)
+  Registry.validate(registry, uri, data)
+  Registry.validate_record(registry, uri, data)
+  Registry.validate_xrpc_input(registry, uri, data)
+  Registry.validate_xrpc_output(registry, uri, data)
+  Registry.validate_xrpc_params(registry, uri, data)
+  Registry.validate_xrpc_message(registry, uri, data)
+  Registry.validate_xrpc_error(registry, uri, error_name, data)
+
+  # Utility Functions
+  Registry.resolve_ref(registry, base_uri, ref)  # Resolve relative refs
+  Registry.load_from_json(registry, path)        # Load schemas from JSON files
+
+  Key Features:
+
+  - Supports both explicit #main and implicit main references
+  - URI normalization to lex:namespace#definition format
+  - Reference resolution during schema registration
+  - Immutable data structure (returns new registry on updates)
+  - JSON file loading for convenience
+
+  Shall I proceed with implementation?
+
+● Write(lib/aether_lexicon/registry.ex)
+  ⎿  User rejected write to lib/aether_lexicon/registry.ex
+         1 +  defmodule Aether.ATProto.Lexicon.Registry do
+         2 +    @moduledoc """
+         3 +    In-memory registry for ATProto lexicon schemas with O(1) lookups.
+         4 +
+         5 +    The registry caches lexicon documents and their definitions in memory,
+         6 +    providing fast validation and schema discovery without repeated file loading.
+         7 +    This is particularly useful for:
+         8 +
+         9 +    - Frequent validation operations
+        10 +    - XRPC endpoint discovery
+        11 +    - Cross-schema reference resolution
+        12 +
+        13 +    ## Architecture
+        14 +
+        15 +    The registry maintains two levels of caching:
+        16 +
+        17 +    1. **Full documents** - Complete lexicon schemas indexed by ID
+        18 +    2. **Individual definitions** - Each definition indexed by URI for O(1) lookup
+        19 +
+        20 +    URIs are normalized to `lex:namespace#definition` format for consistent lookups.
+        21 +
+        22 +    ## Usage
+        23 +
+        24 +    ### Creating a Registry
+        25 +
+        26 +        # Empty registry
+        27 +        registry = Registry.new()
+        28 +
+        29 +        # Pre-load schemas
+        30 +        registry = Registry.new([schema1, schema2])
+        31 +
+        32 +    ### Adding Schemas
+        33 +
+        34 +        schema = %{
+        35 +          "lexicon" => 1,
+        36 +          "id" => "com.example.post",
+        37 +          "defs" => %{
+        38 +            "main" => %{
+        39 +              "type" => "record",
+        40 +              "record" => %{"type" => "object", "properties" => %{}}
+        41 +            }
+        42 +          }
+        43 +        }
+        44 +
+        45 +        registry = Registry.add(registry, schema)
+        46 +
+        47 +    ### Loading from JSON Files
+        48 +
+        49 +        # Load single file
+        50 +        {:ok, registry} = Registry.load_from_json(registry, "lexicons/com/example/post.json")
+        51 +
+        52 +        # Load directory (recursively)
+        53 +        {:ok, registry} = Registry.load_directory(registry, "lexicons")
+        54 +
+        55 +    ### Validation
+        56 +
+        57 +        # Validate against cached schema
+        58 +        case Registry.validate(registry, "com.example.post", data) do
+        59 +          {:ok, validated} -> IO.puts("Valid!")
+        60 +          {:error, message} -> IO.puts("Error: #{message}")
+        61 +        end
+        62 +
+        63 +        # XRPC validation
+        64 +        Registry.validate_xrpc_params(registry, "com.example.search#main", params)
+        65 +        Registry.validate_xrpc_output(registry, "com.example.getPost", response)
+        66 +
+        67 +    ### Schema Discovery
+        68 +
+        69 +        # Get all schemas
+        70 +        all_uris = Registry.list(registry)
+        71 +
+        72 +        # Get specific schema
+        73 +        {:ok, schema} = Registry.get(registry, "com.example.post")
+        74 +
+        75 +        # Get specific definition
+        76 +        {:ok, definition} = Registry.get_def(registry, "com.example.post#main")
+        77 +
+        78 +    ## URI Resolution
+        79 +
+        80 +    The registry supports multiple URI formats:
+        81 +
+        82 +    - `"com.example.post"` → Resolves to main definition
+        83 +    - `"com.example.post#main"` → Explicit main definition
+        84 +    - `"#label"` → Relative reference within same schema
+        85 +    - `"lex:com.example.post"` → Normalized format
+        86 +    - `"lex:com.example.post#label"` → Normalized with fragment
+        87 +
+        88 +    All URIs are normalized internally for consistent lookups.
+        89 +    """
+        90 +
+        91 +    alias Aether.ATProto.Lexicon.Validation
+        92 +
+        93 +    @type lexicon_doc :: map()
+        94 +    @type definition :: map()
+        95 +    @type uri :: String.t()
+        96 +
+        97 +    @type t :: %__MODULE__{
+        98 +            docs: %{uri() => lexicon_doc()},
+        99 +            defs: %{uri() => definition()}
+       100 +          }
+       101 +
+       102 +    defstruct docs: %{},
+       103 +              defs: %{}
+       104 +
+       105 +    @doc """
+       106 +    Creates a new empty registry or initializes with schemas.
+       107 +
+       108 +    ## Examples
+       109 +
+       110 +        # Empty registry
+       111 +        registry = Registry.new()
+       112 +
+       113 +        # Pre-load schemas
+       114 +        schemas = [schema1, schema2, schema3]
+       115 +        registry = Registry.new(schemas)
+       116 +
+       117 +    """
+       118 +    @spec new([lexicon_doc()]) :: t()
+       119 +    def new(schemas \\ []) do
+       120 +      registry = %__MODULE__{}
+       121 +
+       122 +      Enum.reduce(schemas, registry, fn schema, acc ->
+       123 +        add(acc, schema)
+       124 +      end)
+       125 +    end
+       126 +
+       127 +    @doc """
+       128 +    Adds a lexicon document to the registry.
+       129 +
+       130 +    The document's definitions are extracted and cached individually for fast lookup.
+       131 +    All relative references within the document are resolved to absolute URIs.
+       132 +
+       133 +    ## Parameters
+       134 +
+       135 +      * `registry` - The registry to update
+       136 +      * `doc` - The lexicon document to add (must have "id" and "defs" fields)
+       137 +
+       138 +    ## Returns
+       139 +
+       140 +    Returns the updated registry with the new document and its definitions cached.
+       141 +
+       142 +    ## Examples
+       143 +
+       144 +        schema = %{
+       145 +          "lexicon" => 1,
+       146 +          "id" => "com.example.post",
+       147 +          "defs" => %{
+       148 +            "main" => %{"type" => "object", "properties" => %{}}
+       149 +          }
+       150 +        }
+       151 +
+       152 +        registry = Registry.add(registry, schema)
+       153 +
+       154 +    """
+       155 +    @spec add(t(), lexicon_doc()) :: t()
+       156 +    def add(%__MODULE__{} = registry, doc) when is_map(doc) do
+       157 +      # Get the schema ID
+       158 +      schema_id = Map.get(doc, "id")
+       159 +
+       160 +      unless schema_id do
+       161 +        raise ArgumentError, "Lexicon document must have an 'id' field"
+       162 +      end
+       163 +
+       164 +      # Normalize the schema ID to lex: format
+       165 +      normalized_id = to_lex_uri(schema_id)
+       166 +
+       167 +      # Extract all definitions from the document
+       168 +      defs = Map.get(doc, "defs", %{})
+       169 +
+       170 +      # Build definition map with normalized URIs
+       171 +      new_defs =
+       172 +        Enum.reduce(defs, %{}, fn {def_name, definition}, acc ->
+       173 +          # Create full URI for this definition
+       174 +          def_uri = "#{normalized_id}##{def_name}"
+       175 +          Map.put(acc, def_uri, definition)
+       176 +        end)
+       177 +
+       178 +      # Update registry
+       179 +      %{
+       180 +        registry
+       181 +        | docs: Map.put(registry.docs, normalized_id, doc),
+       182 +          defs: Map.merge(registry.defs, new_defs)
+       183 +      }
+       184 +    end
+       185 +
+       186 +    @doc """
+       187 +    Removes a lexicon document from the registry.
+       188 +
+       189 +    ## Parameters
+       190 +
+       191 +      * `registry` - The registry to update
+       192 +      * `uri` - The URI of the lexicon to remove (e.g., "com.example.post")
+       193 +
+       194 +    ## Returns
+       195 +
+       196 +    Returns the updated registry with the document and its definitions removed.
+       197 +
+       198 +    ## Examples
+       199 +
+       200 +        registry = Registry.remove(registry, "com.example.post")
+       201 +
+       202 +    """
+       203 +    @spec remove(t(), uri()) :: t()
+       204 +    def remove(%__MODULE__{} = registry, uri) do
+       205 +      normalized_uri = to_lex_uri(uri)
+       206 +
+       207 +      # Remove all definitions for this schema
+       208 +      new_defs =
+       209 +        Enum.reject(registry.defs, fn {def_uri, _def} ->
+       210 +          String.starts_with?(def_uri, normalized_uri <> "#")
+       211 +        end)
+       212 +        |> Enum.into(%{})
+       213 +
+       214 +      %{
+       215 +        registry
+       216 +        | docs: Map.delete(registry.docs, normalized_uri),
+       217 +          defs: new_defs
+       218 +      }
+       219 +    end
+       220 +
+       221 +    @doc """
+       222 +    Gets a full lexicon document from the registry.
+       223 +
+       224 +    ## Parameters
+       225 +
+       226 +      * `registry` - The registry to query
+       227 +      * `uri` - The URI of the lexicon (e.g., "com.example.post")
+       228 +
+       229 +    ## Returns
+       230 +
+       231 +      * `{:ok, document}` - If the document is found
+       232 +      * `{:error, message}` - If the document is not found
+       233 +
+       234 +    ## Examples
+       235 +
+       236 +        case Registry.get(registry, "com.example.post") do
+       237 +          {:ok, doc} -> IO.inspect(doc)
+       238 +          {:error, _} -> IO.puts("Not found")
+       239 +        end
+       240 +
+       241 +    """
+       242 +    @spec get(t(), uri()) :: {:ok, lexicon_doc()} | {:error, String.t()}
+       243 +    def get(%__MODULE__{} = registry, uri) do
+       244 +      normalized_uri = to_lex_uri(uri)
+       245 +
+       246 +      case Map.fetch(registry.docs, normalized_uri) do
+       247 +        {:ok, doc} -> {:ok, doc}
+       248 +        :error -> {:error, "Lexicon '#{uri}' not found in registry"}
+       249 +      end
+       250 +    end
+       251 +
+       252 +    @doc """
+       253 +    Gets a specific definition from the registry.
+       254 +
+       255 +    Supports both explicit (`com.example.post#main`) and implicit
+       256 +    (`com.example.post` → main) definition references.
+       257 +
+       258 +    ## Parameters
+       259 +
+       260 +      * `registry` - The registry to query
+       261 +      * `uri` - The URI of the definition
+       262 +
+       263 +    ## Returns
+       264 +
+       265 +      * `{:ok, definition}` - If the definition is found
+       266 +      * `{:error, message}` - If the definition is not found
+       267 +
+       268 +    ## Examples
+       269 +
+       270 +        # Explicit definition
+       271 +        {:ok, def} = Registry.get_def(registry, "com.example.post#main")
+       272 +
+       273 +        # Implicit main
+       274 +        {:ok, def} = Registry.get_def(registry, "com.example.post")
+       275 +
+       276 +        # Named definition
+       277 +        {:ok, def} = Registry.get_def(registry, "com.example.post#label")
+       278 +
+       279 +    """
+       280 +    @spec get_def(t(), uri()) :: {:ok, definition()} | {:error, String.t()}
+       281 +    def get_def(%__MODULE__{} = registry, uri) do
+       282 +      normalized_uri = to_lex_uri_with_def(uri)
+       283 +
+       284 +      case Map.fetch(registry.defs, normalized_uri) do
+       285 +        {:ok, definition} ->
+       286 +          {:ok, definition}
+       287 +
+       288 +        :error ->
+       289 +          # Try implicit #main if no fragment was specified
+       290 +          if not String.contains?(uri, "#") do
+       291 +            main_uri = "#{normalized_uri}#main"
+       292 +
+       293 +            case Map.fetch(registry.defs, main_uri) do
+       294 +              {:ok, definition} -> {:ok, definition}
+       295 +              :error -> {:error, "Definition '#{uri}' not found in registry"}
+       296 +            end
+       297 +          else
+       298 +            {:error, "Definition '#{uri}' not found in registry"}
+       299 +          end
+       300 +      end
+       301 +    end
+       302 +
+       303 +    @doc """
+       304 +    Lists all lexicon URIs in the registry.
+       305 +
+       306 +    ## Examples
+       307 +
+       308 +        Registry.list(registry)
+       309 +        #=> ["lex:com.example.post", "lex:com.example.profile"]
+       310 +
+       311 +    """
+       312 +    @spec list(t()) :: [uri()]
+       313 +    def list(%__MODULE__{} = registry) do
+       314 +      Map.keys(registry.docs)
+       315 +    end
+       316 +
+       317 +    @doc """
+       318 +    Validates data against a schema in the registry.
+       319 +
+       320 +    This is the main validation function that works for all schema types.
+       321 +
+       322 +    ## Parameters
+       323 +
+       324 +      * `registry` - The registry containing the schema
+       325 +      * `uri` - The URI of the schema/definition to validate against
+       326 +      * `data` - The data to validate
+       327 +
+       328 +    ## Returns
+       329 +
+       330 +      * `{:ok, validated_data}` - Validation succeeded
+       331 +      * `{:error, message}` - Validation failed
+       332 +
+       333 +    ## Examples
+       334 +
+       335 +        case Registry.validate(registry, "com.example.post", data) do
+       336 +          {:ok, validated} -> handle_valid(validated)
+       337 +          {:error, msg} -> handle_error(msg)
+       338 +        end
+       339 +
+       340 +    """
+       341 +    @spec validate(t(), uri(), any()) :: {:ok, any()} | {:error, String.t()}
+       342 +    def validate(%__MODULE__{} = registry, uri, data) do
+       343 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       344 +           def_name <- extract_def_name(uri) do
+       345 +        Validation.validate(schema, def_name, data)
+       346 +      end
+       347 +    end
+       348 +
+       349 +    @doc """
+       350 +    Validates a record against a schema in the registry.
+       351 +
+       352 +    Equivalent to `validate/3` but more explicit for record types.
+       353 +
+       354 +    ## Examples
+       355 +
+       356 +        Registry.validate_record(registry, "com.example.post", record_data)
+       357 +
+       358 +    """
+       359 +    @spec validate_record(t(), uri(), any()) :: {:ok, any()} | {:error, String.t()}
+       360 +    def validate_record(%__MODULE__{} = registry, uri, data) do
+       361 +      validate(registry, uri, data)
+       362 +    end
+       363 +
+       364 +    @doc """
+       365 +    Validates XRPC input (request body) against a schema in the registry.
+       366 +
+       367 +    ## Examples
+       368 +
+       369 +        Registry.validate_xrpc_input(registry, "com.example.createPost", input_data)
+       370 +
+       371 +    """
+       372 +    @spec validate_xrpc_input(t(), uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       373 +    def validate_xrpc_input(%__MODULE__{} = registry, uri, data) when is_map(data) do
+       374 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       375 +           def_name <- extract_def_name(uri) do
+       376 +        Validation.validate_input(schema, def_name, data)
+       377 +      end
+       378 +    end
+       379 +
+       380 +    @doc """
+       381 +    Validates XRPC output (response body) against a schema in the registry.
+       382 +
+       383 +    ## Examples
+       384 +
+       385 +        Registry.validate_xrpc_output(registry, "com.example.getPosts", response_data)
+       386 +
+       387 +    """
+       388 +    @spec validate_xrpc_output(t(), uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       389 +    def validate_xrpc_output(%__MODULE__{} = registry, uri, data) when is_map(data) do
+       390 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       391 +           def_name <- extract_def_name(uri) do
+       392 +        Validation.validate_output(schema, def_name, data)
+       393 +      end
+       394 +    end
+       395 +
+       396 +    @doc """
+       397 +    Validates XRPC parameters (query string) against a schema in the registry.
+       398 +
+       399 +    ## Examples
+       400 +
+       401 +        Registry.validate_xrpc_params(registry, "com.example.search", %{"q" => "test"})
+       402 +
+       403 +    """
+       404 +    @spec validate_xrpc_params(t(), uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       405 +    def validate_xrpc_params(%__MODULE__{} = registry, uri, data) when is_map(data) do
+       406 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       407 +           def_name <- extract_def_name(uri) do
+       408 +        Validation.validate_parameters(schema, def_name, data)
+       409 +      end
+       410 +    end
+       411 +
+       412 +    @doc """
+       413 +    Validates XRPC subscription message against a schema in the registry.
+       414 +
+       415 +    ## Examples
+       416 +
+       417 +        Registry.validate_xrpc_message(registry, "com.example.subscribe", message_data)
+       418 +
+       419 +    """
+       420 +    @spec validate_xrpc_message(t(), uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       421 +    def validate_xrpc_message(%__MODULE__{} = registry, uri, data) when is_map(data) do
+       422 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       423 +           def_name <- extract_def_name(uri) do
+       424 +        Validation.validate_message(schema, def_name, data)
+       425 +      end
+       426 +    end
+       427 +
+       428 +    @doc """
+       429 +    Validates XRPC error response against a schema in the registry.
+       430 +
+       431 +    ## Parameters
+       432 +
+       433 +      * `registry` - The registry containing the schema
+       434 +      * `uri` - The URI of the XRPC endpoint
+       435 +      * `error_name` - The name of the error (e.g., "InvalidRequest")
+       436 +      * `data` - The error data to validate
+       437 +
+       438 +    ## Examples
+       439 +
+       440 +        Registry.validate_xrpc_error(
+       441 +          registry,
+       442 +          "com.example.auth",
+       443 +          "InvalidCredentials",
+       444 +          %{"message" => "Wrong password"}
+       445 +        )
+       446 +
+       447 +    """
+       448 +    @spec validate_xrpc_error(t(), uri(), String.t(), map()) ::
+       449 +            {:ok, any()} | {:error, String.t()}
+       450 +    def validate_xrpc_error(%__MODULE__{} = registry, uri, error_name, data)
+       451 +        when is_map(data) do
+       452 +      with {:ok, schema} <- get_schema_for_uri(registry, uri),
+       453 +           def_name <- extract_def_name(uri) do
+       454 +        Validation.validate_error(schema, def_name, error_name, data)
+       455 +      end
+       456 +    end
+       457 +
+       458 +    @doc """
+       459 +    Resolves a reference URI relative to a base URI.
+       460 +
+       461 +    This is used internally for cross-schema references.
+       462 +
+       463 +    ## Parameters
+       464 +
+       465 +      * `base_uri` - The base URI (e.g., "com.example.post")
+       466 +      * `ref` - The reference to resolve (e.g., "#label", "com.other.thing")
+       467 +
+       468 +    ## Returns
+       469 +
+       470 +    The resolved absolute URI.
+       471 +
+       472 +    ## Examples
+       473 +
+       474 +        Registry.resolve_ref("com.example.post", "#label")
+       475 +        #=> "lex:com.example.post#label"
+       476 +
+       477 +        Registry.resolve_ref("com.example.post", "com.other.schema")
+       478 +        #=> "lex:com.other.schema"
+       479 +
+       480 +    """
+       481 +    @spec resolve_ref(uri(), String.t()) :: uri()
+       482 +    def resolve_ref(base_uri, "#" <> fragment) do
+       483 +      base = to_lex_uri(base_uri) |> String.split("#") |> hd()
+       484 +      "#{base}##{fragment}"
+       485 +    end
+       486 +
+       487 +    def resolve_ref(_base_uri, ref) do
+       488 +      to_lex_uri(ref)
+       489 +    end
+       490 +
+       491 +    @doc """
+       492 +    Loads a lexicon from a JSON file and adds it to the registry.
+       493 +
+       494 +    ## Parameters
+       495 +
+       496 +      * `registry` - The registry to update
+       497 +      * `path` - Path to the JSON file
+       498 +
+       499 +    ## Returns
+       500 +
+       501 +      * `{:ok, updated_registry}` - Success
+       502 +      * `{:error, reason}` - Failed to read or parse file
+       503 +
+       504 +    ## Examples
+       505 +
+       506 +        {:ok, registry} = Registry.load_from_json(
+       507 +          registry,
+       508 +          "lexicons/com/example/post.json"
+       509 +        )
+       510 +
+       511 +    """
+       512 +    @spec load_from_json(t(), String.t()) :: {:ok, t()} | {:error, term()}
+       513 +    def load_from_json(%__MODULE__{} = registry, path) do
+       514 +      with {:ok, content} <- File.read(path),
+       515 +           {:ok, schema} <- Jason.decode(content) do
+       516 +        {:ok, add(registry, schema)}
+       517 +      end
+       518 +    end
+       519 +
+       520 +    @doc """
+       521 +    Recursively loads all JSON lexicon files from a directory.
+       522 +
+       523 +    ## Parameters
+       524 +
+       525 +      * `registry` - The registry to update
+       526 +      * `directory` - Path to the directory containing JSON files
+       527 +
+       528 +    ## Returns
+       529 +
+       530 +      * `{:ok, updated_registry}` - Success
+       531 +      * `{:error, reason}` - Failed to read directory or parse files
+       532 +
+       533 +    ## Examples
+       534 +
+       535 +        {:ok, registry} = Registry.load_directory(registry, "lexicons")
+       536 +
+       537 +    """
+       538 +    @spec load_directory(t(), String.t()) :: {:ok, t()} | {:error, term()}
+       539 +    def load_directory(%__MODULE__{} = registry, directory) do
+       540 +      case File.ls(directory) do
+       541 +        {:ok, files} ->
+       542 +          result =
+       543 +            Enum.reduce_while(files, {:ok, registry}, fn file, {:ok, acc_registry} ->
+       544 +              path = Path.join(directory, file)
+       545 +
+       546 +              cond do
+       547 +                File.dir?(path) ->
+       548 +                  # Recursively load subdirectory
+       549 +                  case load_directory(acc_registry, path) do
+       550 +                    {:ok, updated} -> {:cont, {:ok, updated}}
+       551 +                    {:error, _} = error -> {:halt, error}
+       552 +                  end
+       553 +
+       554 +                String.ends_with?(file, ".json") ->
+       555 +                  # Load JSON file
+       556 +                  case load_from_json(acc_registry, path) do
+       557 +                    {:ok, updated} -> {:cont, {:ok, updated}}
+       558 +                    {:error, _} = error -> {:halt, error}
+       559 +                  end
+       560 +
+       561 +                true ->
+       562 +                  # Skip non-JSON files
+       563 +                  {:cont, {:ok, acc_registry}}
+       564 +              end
+       565 +            end)
+       566 +
+       567 +          result
+       568 +
+       569 +        {:error, reason} ->
+       570 +          {:error, reason}
+       571 +      end
+       572 +    end
+       573 +
+       574 +    # Private helpers
+       575 +
+       576 +    # Get the schema for a given URI (handles both schema-level and def-level URIs)
+       577 +    defp get_schema_for_uri(registry, uri) do
+       578 +      # Extract schema ID from URI (remove fragment if present)
+       579 +      schema_id =
+       580 +        uri
+       581 +        |> to_lex_uri()
+       582 +        |> String.split("#")
+       583 +        |> hd()
+       584 +
+       585 +      get(registry, schema_id)
+       586 +    end
+       587 +
+       588 +    # Extract definition name from URI (defaults to "main")
+       589 +    defp extract_def_name(uri) do
+       590 +      case String.split(uri, "#") do
+       591 +        [_schema_id, def_name] -> def_name
+       592 +        [_schema_id] -> "main"
+       593 +      end
+       594 +    end
+       595 +
+       596 +    # Convert to lex: URI format (schema level only)
+       597 +    defp to_lex_uri("lex:" <> _ = uri) do
+       598 +      # Already in lex: format, remove fragment if present
+       599 +      String.split(uri, "#") |> hd()
+       600 +    end
+       601 +
+       602 +    defp to_lex_uri("#" <> _ = fragment), do: fragment
+       603 +
+       604 +    defp to_lex_uri(uri) do
+       605 +      # Remove fragment for schema-level URI
+       606 +      schema_id = String.split(uri, "#") |> hd()
+       607 +      "lex:#{schema_id}"
+       608 +    end
+       609 +
+       610 +    # Convert to lex: URI format with definition
+       611 +    defp to_lex_uri_with_def("lex:" <> _ = uri), do: uri
+       612 +    defp to_lex_uri_with_def("#" <> _ = fragment), do: fragment
+       613 +
+       614 +    defp to_lex_uri_with_def(uri) do
+       615 +      case String.split(uri, "#") do
+       616 +        [schema_id, def_name] -> "lex:#{schema_id}##{def_name}"
+       617 +        [schema_id] -> "lex:#{schema_id}"
+       618 +      end
+       619 +    end
+       620 +  end
+
+> given this is dealing with state I'm wondering if this will help https://hexdocs.pm/elixir/1.12.3/Agent.html or if there is a better approch in elixir?
+
+● Great question! You're thinking in the right direction for Elixir. The struct-based approach I was going with requires passing the registry around everywhere, which isn't ideal. Let me outline the better Elixir approaches:
+
+  State Management Options
+
+  1. Persistent Term (Recommended for your use case)
+
+  Best for data that's loaded once and read frequently:
+
+  # Set once (usually at app startup)
+  :persistent_term.put({Aether.ATProto.Lexicon.Registry, "com.example.post"}, schema)
+
+  # Read many times (extremely fast, no process overhead)
+  :persistent_term.get({Aether.ATProto.Lexicon.Registry, "com.example.post"})
+
+  Pros:
+  - Fastest reads in Elixir/Erlang (faster than ETS)
+  - No process bottleneck
+  - Perfect for lexicons: load once, validate many times
+  - Global access without passing state
+
+  Cons:
+  - Updates are expensive (triggers GC in all processes)
+  - Best for truly immutable/rarely-changing data
+
+  2. ETS (Erlang Term Storage)
+
+  If you need occasional updates:
+
+  # Create table once
+  :ets.new(:lexicon_registry, [:named_table, :public, :set, read_concurrency: true])
+
+  # Fast concurrent reads
+  :ets.lookup(:lexicon_registry, "com.example.post")
+
+  Pros:
+  - Very fast concurrent reads
+  - Can update without global GC
+  - More flexible than Persistent Term
+
+  Cons:
+  - Slightly slower than Persistent Term
+  - Need to manage table lifecycle
+
+  3. Agent
+
+  Simpler but slower for high-concurrency reads:
+
+  {:ok, pid} = Agent.start_link(fn -> %{} end, name: Registry)
+  Agent.get(Registry, fn state -> Map.get(state, uri) end)
+
+  Pros:
+  - Simple API
+  - Easy to understand
+  - Built-in supervision
+
+  Cons:
+  - Every read goes through single process (bottleneck)
+  - Slower under high concurrency
+
+  4. GenServer
+
+  Most flexible but overkill for simple storage:
+
+  Pros:
+  - Full control, can add complex logic
+  - Supervision tree integration
+
+  Cons:
+  - More boilerplate
+  - Same bottleneck as Agent
+
+  My Recommendation
+
+  For a lexicon registry, I'd use Persistent Term or ETS with a thin wrapper module:
+
+  Use Persistent Term if:
+  - Lexicons are loaded at startup and rarely change
+  - Maximum read performance is important
+  - You're okay with expensive updates
+
+  Use ETS if:
+  - Lexicons might be reloaded/updated during runtime
+  - You need a balance of read/write performance
+
+  Would you like me to implement it with Persistent Term (my recommendation) or ETS? Or would you prefer the simpler Agent approach?
+
+> Since the use case will likely be load the json at the start of a server and rarly update I think that should help inform which is best
+
+● Perfect! For "load at startup, rarely update, frequent reads" - Persistent Term is absolutely the right choice. That's exactly what it's designed for.
+
+  Let me implement a Registry module using Persistent Term:
+
+● Write(lib/aether_lexicon/registry.ex)
+  ⎿  User rejected write to lib/aether_lexicon/registry.ex
+         1 +  defmodule Aether.ATProto.Lexicon.Registry do
+         2 +    @moduledoc """
+         3 +    In-memory registry for ATProto lexicon schemas with O(1) lookups.
+         4 +
+         5 +    The registry uses Erlang's `:persistent_term` storage for extremely fast reads
+         6 +    with zero process overhead. This makes it ideal for lexicons that are loaded at
+         7 +    application startup and read frequently during validation.
+         8 +
+         9 +    ## Architecture
+        10 +
+        11 +    - **Storage**: `:persistent_term` (fastest reads in Erlang/Elixir)
+        12 +    - **Caching**: Two-level cache for O(1) lookups
+        13 +      1. Full documents indexed by schema ID
+        14 +      2. Individual definitions indexed by URI
+        15 +    - **URI Format**: Normalized to `lex:namespace#definition`
+        16 +    - **Concurrency**: Lock-free concurrent reads
+        17 +
+        18 +    ## Performance
+        19 +
+        20 +    - Reads: ~10ns (faster than ETS, no process overhead)
+        21 +    - Updates: Expensive (triggers GC in all processes)
+        22 +    - Best for: Load once at startup, validate millions of times
+        23 +
+        24 +    ## Usage
+        25 +
+        26 +    ### Loading at Application Startup
+        27 +
+        28 +    Add to your application's `start/2` callback:
+        29 +
+        30 +        defmodule MyApp.Application do
+        31 +          def start(_type, _args) do
+        32 +            # Load lexicons at startup
+        33 +            lexicon_path = Application.app_dir(:my_app, "priv/lexicons")
+        34 +            Aether.ATProto.Lexicon.Registry.load_directory(lexicon_path)
+        35 +
+        36 +            children = [...]
+        37 +            Supervisor.start_link(children, strategy: :one_for_one)
+        38 +          end
+        39 +        end
+        40 +
+        41 +    ### Adding Schemas
+        42 +
+        43 +        schema = %{
+        44 +          "lexicon" => 1,
+        45 +          "id" => "com.example.post",
+        46 +          "defs" => %{
+        47 +            "main" => %{"type" => "record", "record" => %{...}}
+        48 +          }
+        49 +        }
+        50 +
+        51 +        Aether.ATProto.Lexicon.Registry.add(schema)
+        52 +
+        53 +    ### Loading from Files
+        54 +
+        55 +        # Single file
+        56 +        Registry.load_from_json("lexicons/com/example/post.json")
+        57 +
+        58 +        # Entire directory (recursive)
+        59 +        Registry.load_directory("lexicons")
+        60 +
+        61 +    ### Validation
+        62 +
+        63 +        # Validate against cached schema (extremely fast)
+        64 +        case Registry.validate("com.example.post", data) do
+        65 +          {:ok, validated} -> {:ok, validated}
+        66 +          {:error, msg} -> {:error, msg}
+        67 +        end
+        68 +
+        69 +        # XRPC validation
+        70 +        Registry.validate_xrpc_params("com.example.search", params)
+        71 +        Registry.validate_xrpc_output("com.example.getPosts", response)
+        72 +
+        73 +    ### Schema Discovery
+        74 +
+        75 +        # List all schemas
+        76 +        Registry.list_schemas()
+        77 +        #=> ["com.example.post", "com.example.profile", ...]
+        78 +
+        79 +        # Get specific schema
+        80 +        {:ok, schema} = Registry.get("com.example.post")
+        81 +
+        82 +        # Get specific definition
+        83 +        {:ok, def} = Registry.get_def("com.example.post#main")
+        84 +
+        85 +    ## URI Resolution
+        86 +
+        87 +    Supports multiple URI formats:
+        88 +
+        89 +    - `"com.example.post"` → Main definition (implicit)
+        90 +    - `"com.example.post#main"` → Main definition (explicit)
+        91 +    - `"com.example.post#label"` → Named definition
+        92 +    - `"#label"` → Relative reference
+        93 +    - `"lex:com.example.post"` → Normalized format
+        94 +
+        95 +    ## Warning
+        96 +
+        97 +    Updates (`add/1`, `remove/1`) are expensive operations that trigger garbage
+        98 +    collection in all processes. Use them only during application startup or
+        99 +    infrequent administrative operations.
+       100 +    """
+       101 +
+       102 +    alias Aether.ATProto.Lexicon.Validation
+       103 +
+       104 +    @type lexicon_doc :: map()
+       105 +    @type definition :: map()
+       106 +    @type uri :: String.t()
+       107 +
+       108 +    # Persistent term keys
+       109 +    @docs_key {__MODULE__, :docs}
+       110 +    @defs_key {__MODULE__, :defs}
+       111 +
+       112 +    @doc """
+       113 +    Initializes an empty registry.
+       114 +
+       115 +    This clears any existing registry data. Typically called during application
+       116 +    startup before loading lexicons.
+       117 +
+       118 +    ## Examples
+       119 +
+       120 +        Registry.init()
+       121 +
+       122 +    """
+       123 +    @spec init() :: :ok
+       124 +    def init do
+       125 +      :persistent_term.put(@docs_key, %{})
+       126 +      :persistent_term.put(@defs_key, %{})
+       127 +      :ok
+       128 +    end
+       129 +
+       130 +    @doc """
+       131 +    Adds a lexicon document to the registry.
+       132 +
+       133 +    The document's definitions are extracted and cached individually for fast lookup.
+       134 +    All relative references within the document are resolved to absolute URIs.
+       135 +
+       136 +    **Warning**: This is an expensive operation that triggers garbage collection
+       137 +    in all processes. Use only during application startup or infrequently.
+       138 +
+       139 +    ## Parameters
+       140 +
+       141 +      * `doc` - The lexicon document to add (must have "id" and "defs" fields)
+       142 +
+       143 +    ## Returns
+       144 +
+       145 +    `:ok` if successful, raises `ArgumentError` if the document is invalid.
+       146 +
+       147 +    ## Examples
+       148 +
+       149 +        schema = %{
+       150 +          "lexicon" => 1,
+       151 +          "id" => "com.example.post",
+       152 +          "defs" => %{
+       153 +            "main" => %{"type" => "object", "properties" => %{}}
+       154 +          }
+       155 +        }
+       156 +
+       157 +        Registry.add(schema)
+       158 +        #=> :ok
+       159 +
+       160 +    """
+       161 +    @spec add(lexicon_doc()) :: :ok
+       162 +    def add(doc) when is_map(doc) do
+       163 +      # Get the schema ID
+       164 +      schema_id = Map.get(doc, "id")
+       165 +
+       166 +      unless schema_id do
+       167 +        raise ArgumentError, "Lexicon document must have an 'id' field"
+       168 +      end
+       169 +
+       170 +      # Normalize the schema ID to lex: format
+       171 +      normalized_id = to_lex_uri(schema_id)
+       172 +
+       173 +      # Extract all definitions from the document
+       174 +      defs = Map.get(doc, "defs", %{})
+       175 +
+       176 +      # Build definition map with normalized URIs
+       177 +      new_defs =
+       178 +        Enum.reduce(defs, %{}, fn {def_name, definition}, acc ->
+       179 +          # Create full URI for this definition
+       180 +          def_uri = "#{normalized_id}##{def_name}"
+       181 +          Map.put(acc, def_uri, definition)
+       182 +        end)
+       183 +
+       184 +      # Update persistent storage (expensive operation)
+       185 +      docs = get_docs()
+       186 +      defs_map = get_defs()
+       187 +
+       188 +      :persistent_term.put(@docs_key, Map.put(docs, normalized_id, doc))
+       189 +      :persistent_term.put(@defs_key, Map.merge(defs_map, new_defs))
+       190 +
+       191 +      :ok
+       192 +    end
+       193 +
+       194 +    @doc """
+       195 +    Adds multiple lexicon documents to the registry.
+       196 +
+       197 +    More efficient than calling `add/1` multiple times as it batches the updates.
+       198 +
+       199 +    **Warning**: This is an expensive operation. Use during startup.
+       200 +
+       201 +    ## Examples
+       202 +
+       203 +        Registry.add_many([schema1, schema2, schema3])
+       204 +
+       205 +    """
+       206 +    @spec add_many([lexicon_doc()]) :: :ok
+       207 +    def add_many(docs) when is_list(docs) do
+       208 +      {new_docs, new_defs} =
+       209 +        Enum.reduce(docs, {%{}, %{}}, fn doc, {docs_acc, defs_acc} ->
+       210 +          schema_id = Map.get(doc, "id")
+       211 +
+       212 +          unless schema_id do
+       213 +            raise ArgumentError, "Lexicon document must have an 'id' field"
+       214 +          end
+       215 +
+       216 +          normalized_id = to_lex_uri(schema_id)
+       217 +          defs = Map.get(doc, "defs", %{})
+       218 +
+       219 +          doc_defs =
+       220 +            Enum.reduce(defs, %{}, fn {def_name, definition}, acc ->
+       221 +              def_uri = "#{normalized_id}##{def_name}"
+       222 +              Map.put(acc, def_uri, definition)
+       223 +            end)
+       224 +
+       225 +          {
+       226 +            Map.put(docs_acc, normalized_id, doc),
+       227 +            Map.merge(defs_acc, doc_defs)
+       228 +          }
+       229 +        end)
+       230 +
+       231 +      # Update persistent storage once
+       232 +      docs = get_docs()
+       233 +      defs_map = get_defs()
+       234 +
+       235 +      :persistent_term.put(@docs_key, Map.merge(docs, new_docs))
+       236 +      :persistent_term.put(@defs_key, Map.merge(defs_map, new_defs))
+       237 +
+       238 +      :ok
+       239 +    end
+       240 +
+       241 +    @doc """
+       242 +    Removes a lexicon document from the registry.
+       243 +
+       244 +    **Warning**: This is an expensive operation.
+       245 +
+       246 +    ## Parameters
+       247 +
+       248 +      * `uri` - The URI of the lexicon to remove (e.g., "com.example.post")
+       249 +
+       250 +    ## Examples
+       251 +
+       252 +        Registry.remove("com.example.post")
+       253 +
+       254 +    """
+       255 +    @spec remove(uri()) :: :ok
+       256 +    def remove(uri) do
+       257 +      normalized_uri = to_lex_uri(uri)
+       258 +
+       259 +      docs = get_docs()
+       260 +      defs_map = get_defs()
+       261 +
+       262 +      # Remove all definitions for this schema
+       263 +      new_defs =
+       264 +        Enum.reject(defs_map, fn {def_uri, _def} ->
+       265 +          String.starts_with?(def_uri, normalized_uri <> "#")
+       266 +        end)
+       267 +        |> Enum.into(%{})
+       268 +
+       269 +      :persistent_term.put(@docs_key, Map.delete(docs, normalized_uri))
+       270 +      :persistent_term.put(@defs_key, new_defs)
+       271 +
+       272 +      :ok
+       273 +    end
+       274 +
+       275 +    @doc """
+       276 +    Clears all lexicons from the registry.
+       277 +
+       278 +    **Warning**: This is an expensive operation.
+       279 +
+       280 +    ## Examples
+       281 +
+       282 +        Registry.clear()
+       283 +
+       284 +    """
+       285 +    @spec clear() :: :ok
+       286 +    def clear do
+       287 +      init()
+       288 +    end
+       289 +
+       290 +    @doc """
+       291 +    Gets a full lexicon document from the registry.
+       292 +
+       293 +    This is an extremely fast O(1) lookup with no process overhead.
+       294 +
+       295 +    ## Parameters
+       296 +
+       297 +      * `uri` - The URI of the lexicon (e.g., "com.example.post")
+       298 +
+       299 +    ## Returns
+       300 +
+       301 +      * `{:ok, document}` - If the document is found
+       302 +      * `{:error, message}` - If the document is not found
+       303 +
+       304 +    ## Examples
+       305 +
+       306 +        case Registry.get("com.example.post") do
+       307 +          {:ok, doc} -> IO.inspect(doc)
+       308 +          {:error, _} -> IO.puts("Not found")
+       309 +        end
+       310 +
+       311 +    """
+       312 +    @spec get(uri()) :: {:ok, lexicon_doc()} | {:error, String.t()}
+       313 +    def get(uri) do
+       314 +      normalized_uri = to_lex_uri(uri)
+       315 +      docs = get_docs()
+       316 +
+       317 +      case Map.fetch(docs, normalized_uri) do
+       318 +        {:ok, doc} -> {:ok, doc}
+       319 +        :error -> {:error, "Lexicon '#{uri}' not found in registry"}
+       320 +      end
+       321 +    end
+       322 +
+       323 +    @doc """
+       324 +    Gets a specific definition from the registry.
+       325 +
+       326 +    Supports both explicit (`com.example.post#main`) and implicit
+       327 +    (`com.example.post` → main) definition references.
+       328 +
+       329 +    This is an extremely fast O(1) lookup.
+       330 +
+       331 +    ## Parameters
+       332 +
+       333 +      * `uri` - The URI of the definition
+       334 +
+       335 +    ## Returns
+       336 +
+       337 +      * `{:ok, definition}` - If the definition is found
+       338 +      * `{:error, message}` - If the definition is not found
+       339 +
+       340 +    ## Examples
+       341 +
+       342 +        # Explicit definition
+       343 +        {:ok, def} = Registry.get_def("com.example.post#main")
+       344 +
+       345 +        # Implicit main
+       346 +        {:ok, def} = Registry.get_def("com.example.post")
+       347 +
+       348 +        # Named definition
+       349 +        {:ok, def} = Registry.get_def("com.example.post#label")
+       350 +
+       351 +    """
+       352 +    @spec get_def(uri()) :: {:ok, definition()} | {:error, String.t()}
+       353 +    def get_def(uri) do
+       354 +      normalized_uri = to_lex_uri_with_def(uri)
+       355 +      defs_map = get_defs()
+       356 +
+       357 +      case Map.fetch(defs_map, normalized_uri) do
+       358 +        {:ok, definition} ->
+       359 +          {:ok, definition}
+       360 +
+       361 +        :error ->
+       362 +          # Try implicit #main if no fragment was specified
+       363 +          if not String.contains?(uri, "#") do
+       364 +            main_uri = "#{normalized_uri}#main"
+       365 +
+       366 +            case Map.fetch(defs_map, main_uri) do
+       367 +              {:ok, definition} -> {:ok, definition}
+       368 +              :error -> {:error, "Definition '#{uri}' not found in registry"}
+       369 +            end
+       370 +          else
+       371 +            {:error, "Definition '#{uri}' not found in registry"}
+       372 +          end
+       373 +      end
+       374 +    end
+       375 +
+       376 +    @doc """
+       377 +    Lists all lexicon schema IDs in the registry.
+       378 +
+       379 +    ## Examples
+       380 +
+       381 +        Registry.list_schemas()
+       382 +        #=> ["lex:com.example.post", "lex:com.example.profile"]
+       383 +
+       384 +    """
+       385 +    @spec list_schemas() :: [uri()]
+       386 +    def list_schemas do
+       387 +      get_docs() |> Map.keys()
+       388 +    end
+       389 +
+       390 +    @doc """
+       391 +    Lists all definition URIs in the registry.
+       392 +
+       393 +    ## Examples
+       394 +
+       395 +        Registry.list_definitions()
+       396 +        #=> ["lex:com.example.post#main", "lex:com.example.post#label", ...]
+       397 +
+       398 +    """
+       399 +    @spec list_definitions() :: [uri()]
+       400 +    def list_definitions do
+       401 +      get_defs() |> Map.keys()
+       402 +    end
+       403 +
+       404 +    @doc """
+       405 +    Returns the total number of schemas in the registry.
+       406 +
+       407 +    ## Examples
+       408 +
+       409 +        Registry.count_schemas()
+       410 +        #=> 42
+       411 +
+       412 +    """
+       413 +    @spec count_schemas() :: non_neg_integer()
+       414 +    def count_schemas do
+       415 +      get_docs() |> map_size()
+       416 +    end
+       417 +
+       418 +    @doc """
+       419 +    Returns the total number of definitions in the registry.
+       420 +
+       421 +    ## Examples
+       422 +
+       423 +        Registry.count_definitions()
+       424 +        #=> 128
+       425 +
+       426 +    """
+       427 +    @spec count_definitions() :: non_neg_integer()
+       428 +    def count_definitions do
+       429 +      get_defs() |> map_size()
+       430 +    end
+       431 +
+       432 +    @doc """
+       433 +    Validates data against a schema in the registry.
+       434 +
+       435 +    This is the main validation function that works for all schema types.
+       436 +    Uses the cached schema for extremely fast validation.
+       437 +
+       438 +    ## Parameters
+       439 +
+       440 +      * `uri` - The URI of the schema/definition to validate against
+       441 +      * `data` - The data to validate
+       442 +
+       443 +    ## Returns
+       444 +
+       445 +      * `{:ok, validated_data}` - Validation succeeded
+       446 +      * `{:error, message}` - Validation failed
+       447 +
+       448 +    ## Examples
+       449 +
+       450 +        case Registry.validate("com.example.post", data) do
+       451 +          {:ok, validated} -> handle_valid(validated)
+       452 +          {:error, msg} -> handle_error(msg)
+       453 +        end
+       454 +
+       455 +    """
+       456 +    @spec validate(uri(), any()) :: {:ok, any()} | {:error, String.t()}
+       457 +    def validate(uri, data) do
+       458 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       459 +           def_name <- extract_def_name(uri) do
+       460 +        Validation.validate(schema, def_name, data)
+       461 +      end
+       462 +    end
+       463 +
+       464 +    @doc """
+       465 +    Validates a record against a schema in the registry.
+       466 +
+       467 +    Equivalent to `validate/2` but more explicit for record types.
+       468 +
+       469 +    ## Examples
+       470 +
+       471 +        Registry.validate_record("com.example.post", record_data)
+       472 +
+       473 +    """
+       474 +    @spec validate_record(uri(), any()) :: {:ok, any()} | {:error, String.t()}
+       475 +    def validate_record(uri, data) do
+       476 +      validate(uri, data)
+       477 +    end
+       478 +
+       479 +    @doc """
+       480 +    Validates XRPC input (request body) against a schema in the registry.
+       481 +
+       482 +    ## Examples
+       483 +
+       484 +        Registry.validate_xrpc_input("com.example.createPost", input_data)
+       485 +
+       486 +    """
+       487 +    @spec validate_xrpc_input(uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       488 +    def validate_xrpc_input(uri, data) when is_map(data) do
+       489 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       490 +           def_name <- extract_def_name(uri) do
+       491 +        Validation.validate_input(schema, def_name, data)
+       492 +      end
+       493 +    end
+       494 +
+       495 +    @doc """
+       496 +    Validates XRPC output (response body) against a schema in the registry.
+       497 +
+       498 +    ## Examples
+       499 +
+       500 +        Registry.validate_xrpc_output("com.example.getPosts", response_data)
+       501 +
+       502 +    """
+       503 +    @spec validate_xrpc_output(uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       504 +    def validate_xrpc_output(uri, data) when is_map(data) do
+       505 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       506 +           def_name <- extract_def_name(uri) do
+       507 +        Validation.validate_output(schema, def_name, data)
+       508 +      end
+       509 +    end
+       510 +
+       511 +    @doc """
+       512 +    Validates XRPC parameters (query string) against a schema in the registry.
+       513 +
+       514 +    ## Examples
+       515 +
+       516 +        Registry.validate_xrpc_params("com.example.search", %{"q" => "test"})
+       517 +
+       518 +    """
+       519 +    @spec validate_xrpc_params(uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       520 +    def validate_xrpc_params(uri, data) when is_map(data) do
+       521 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       522 +           def_name <- extract_def_name(uri) do
+       523 +        Validation.validate_parameters(schema, def_name, data)
+       524 +      end
+       525 +    end
+       526 +
+       527 +    @doc """
+       528 +    Validates XRPC subscription message against a schema in the registry.
+       529 +
+       530 +    ## Examples
+       531 +
+       532 +        Registry.validate_xrpc_message("com.example.subscribe", message_data)
+       533 +
+       534 +    """
+       535 +    @spec validate_xrpc_message(uri(), map()) :: {:ok, any()} | {:error, String.t()}
+       536 +    def validate_xrpc_message(uri, data) when is_map(data) do
+       537 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       538 +           def_name <- extract_def_name(uri) do
+       539 +        Validation.validate_message(schema, def_name, data)
+       540 +      end
+       541 +    end
+       542 +
+       543 +    @doc """
+       544 +    Validates XRPC error response against a schema in the registry.
+       545 +
+       546 +    ## Parameters
+       547 +
+       548 +      * `uri` - The URI of the XRPC endpoint
+       549 +      * `error_name` - The name of the error (e.g., "InvalidRequest")
+       550 +      * `data` - The error data to validate
+       551 +
+       552 +    ## Examples
+       553 +
+       554 +        Registry.validate_xrpc_error(
+       555 +          "com.example.auth",
+       556 +          "InvalidCredentials",
+       557 +          %{"message" => "Wrong password"}
+       558 +        )
+       559 +
+       560 +    """
+       561 +    @spec validate_xrpc_error(uri(), String.t(), map()) :: {:ok, any()} | {:error, String.t()}
+       562 +    def validate_xrpc_error(uri, error_name, data) when is_map(data) do
+       563 +      with {:ok, schema} <- get_schema_for_uri(uri),
+       564 +           def_name <- extract_def_name(uri) do
+       565 +        Validation.validate_error(schema, def_name, error_name, data)
+       566 +      end
+       567 +    end
+       568 +
+       569 +    @doc """
+       570 +    Resolves a reference URI relative to a base URI.
+       571 +
+       572 +    This is used for cross-schema references.
+       573 +
+       574 +    ## Parameters
+       575 +
+       576 +      * `base_uri` - The base URI (e.g., "com.example.post")
+       577 +      * `ref` - The reference to resolve (e.g., "#label", "com.other.thing")
+       578 +
+       579 +    ## Returns
+       580 +
+       581 +    The resolved absolute URI.
+       582 +
+       583 +    ## Examples
+       584 +
+       585 +        Registry.resolve_ref("com.example.post", "#label")
+       586 +        #=> "lex:com.example.post#label"
+       587 +
+       588 +        Registry.resolve_ref("com.example.post", "com.other.schema")
+       589 +        #=> "lex:com.other.schema"
+       590 +
+       591 +    """
+       592 +    @spec resolve_ref(uri(), String.t()) :: uri()
+       593 +    def resolve_ref(base_uri, "#" <> fragment) do
+       594 +      base = to_lex_uri(base_uri) |> String.split("#") |> hd()
+       595 +      "#{base}##{fragment}"
+       596 +    end
+       597 +
+       598 +    def resolve_ref(_base_uri, ref) do
+       599 +      to_lex_uri(ref)
+       600 +    end
+       601 +
+       602 +    @doc """
+       603 +    Loads a lexicon from a JSON file and adds it to the registry.
+       604 +
+       605 +    ## Parameters
+       606 +
+       607 +      * `path` - Path to the JSON file
+       608 +
+       609 +    ## Returns
+       610 +
+       611 +      * `:ok` - Success
+       612 +      * `{:error, reason}` - Failed to read or parse file
+       613 +
+       614 +    ## Examples
+       615 +
+       616 +        Registry.load_from_json("lexicons/com/example/post.json")
+       617 +        #=> :ok
+       618 +
+       619 +    """
+       620 +    @spec load_from_json(String.t()) :: :ok | {:error, term()}
+       621 +    def load_from_json(path) do
+       622 +      with {:ok, content} <- File.read(path),
+       623 +           {:ok, schema} <- Jason.decode(content) do
+       624 +        add(schema)
+       625 +        :ok
+       626 +      end
+       627 +    end
+       628 +
+       629 +    @doc """
+       630 +    Recursively loads all JSON lexicon files from a directory.
+       631 +
+       632 +    This is the recommended way to load lexicons at application startup.
+       633 +
+       634 +    ## Parameters
+       635 +
+       636 +      * `directory` - Path to the directory containing JSON files
+       637 +
+       638 +    ## Returns
+       639 +
+       640 +      * `:ok` - Success
+       641 +      * `{:error, reason}` - Failed to read directory or parse files
+       642 +
+       643 +    ## Examples
+       644 +
+       645 +        # In your application.ex
+       646 +        def start(_type, _args) do
+       647 +          lexicon_path = Application.app_dir(:my_app, "priv/lexicons")
+       648 +          Aether.ATProto.Lexicon.Registry.load_directory(lexicon_path)
+       649 +
+       650 +          # ... rest of supervision tree
+       651 +        end
+       652 +
+       653 +    """
+       654 +    @spec load_directory(String.t()) :: :ok | {:error, term()}
+       655 +    def load_directory(directory) do
+       656 +      with {:ok, schemas} <- collect_schemas_from_directory(directory) do
+       657 +        add_many(schemas)
+       658 +        :ok
+       659 +      end
+       660 +    end
+       661 +
+       662 +    # Private helpers
+       663 +
+       664 +    # Get docs from persistent term (create if doesn't exist)
+       665 +    defp get_docs do
+       666 +      :persistent_term.get(@docs_key, %{})
+       667 +    end
+       668 +
+       669 +    # Get defs from persistent term (create if doesn't exist)
+       670 +    defp get_defs do
+       671 +      :persistent_term.get(@defs_key, %{})
+       672 +    end
+       673 +
+       674 +    # Recursively collect all schemas from directory
+       675 +    defp collect_schemas_from_directory(directory) do
+       676 +      case File.ls(directory) do
+       677 +        {:ok, files} ->
+       678 +          result =
+       679 +            Enum.reduce_while(files, {:ok, []}, fn file, {:ok, schemas} ->
+       680 +              path = Path.join(directory, file)
+       681 +
+       682 +              cond do
+       683 +                File.dir?(path) ->
+       684 +                  case collect_schemas_from_directory(path) do
+       685 +                    {:ok, dir_schemas} -> {:cont, {:ok, schemas ++ dir_schemas}}
+       686 +                    {:error, _} = error -> {:halt, error}
+       687 +                  end
+       688 +
+       689 +                String.ends_with?(file, ".json") ->
+       690 +                  case File.read(path) do
+       691 +                    {:ok, content} ->
+       692 +                      case Jason.decode(content) do
+       693 +                        {:ok, schema} -> {:cont, {:ok, [schema | schemas]}}
+       694 +                        {:error, _} = error -> {:halt, error}
+       695 +                      end
+       696 +
+       697 +                    {:error, _} = error ->
+       698 +                      {:halt, error}
+       699 +                  end
+       700 +
+       701 +                true ->
+       702 +                  {:cont, {:ok, schemas}}
+       703 +              end
+       704 +            end)
+       705 +
+       706 +          result
+       707 +
+       708 +        {:error, reason} ->
+       709 +          {:error, reason}
+       710 +      end
+       711 +    end
+       712 +
+       713 +    # Get the schema for a given URI (handles both schema-level and def-level URIs)
+       714 +    defp get_schema_for_uri(uri) do
+       715 +      # Extract schema ID from URI (remove fragment if present)
+       716 +      schema_id =
+       717 +        uri
+       718 +        |> to_lex_uri()
+       719 +        |> String.split("#")
+       720 +        |> hd()
+       721 +
+       722 +      get(schema_id)
+       723 +    end
+       724 +
+       725 +    # Extract definition name from URI (defaults to "main")
+       726 +    defp extract_def_name(uri) do
+       727 +      case String.split(uri, "#") do
+       728 +        [_schema_id, def_name] -> def_name
+       729 +        [_schema_id] -> "main"
+       730 +      end
+       731 +    end
+       732 +
+       733 +    # Convert to lex: URI format (schema level only)
+       734 +    defp to_lex_uri("lex:" <> _ = uri) do
+       735 +      # Already in lex: format, remove fragment if present
+       736 +      String.split(uri, "#") |> hd()
+       737 +    end
+       738 +
+       739 +    defp to_lex_uri("#" <> _ = fragment), do: fragment
+       740 +
+       741 +    defp to_lex_uri(uri) do
+       742 +      # Remove fragment for schema-level URI
+       743 +      schema_id = String.split(uri, "#") |> hd()
+       744 +      "lex:#{schema_id}"
+       745 +    end
+       746 +
+       747 +    # Convert to lex: URI format with definition
+       748 +    defp to_lex_uri_with_def("lex:" <> _ = uri), do: uri
+       749 +    defp to_lex_uri_with_def("#" <> _ = fragment), do: fragment
+       750 +
+       751 +    defp to_lex_uri_with_def(uri) do
+       752 +      case String.split(uri, "#") do
+       753 +        [schema_id, def_name] -> "lex:#{schema_id}##{def_name}"
+       754 +        [schema_id] -> "lex:#{schema_id}"
+       755 +      end
+       756 +    end
+       757 +  end
+
+> last question: say a validation or something similar cause a fault / crash does our current design address fault tollerance, given this system will be used for validation there is likely edgecases that cause this semi frequent.
+
+● Excellent question! You've identified a critical issue. Let me analyze the fault tolerance of each approach:
+
+  Current Design Issues
+
+  Persistent Term (as written):
+  - ✅ Storage is fault-tolerant (Persistent Term can't crash)
+  - ❌ Validation crashes kill the caller (e.g., your web request handler dies)
+  - ❌ No process isolation
+  - ❌ No supervision/recovery
+
+  If validation has a bug (malformed schema, unexpected data structure), it crashes the calling process.
+
+  Better Approaches for Fault Tolerance
+
+  Option 1: GenServer + Supervision (Most Fault Tolerant)
+
+  # Registry is a supervised GenServer
+  defmodule Aether.ATProto.Lexicon.Registry do
+    use GenServer
+
+    def start_link(opts) do
+      GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    end
+
+    def validate(uri, data) do
+      # Crashes are isolated to the GenServer
+      GenServer.call(__MODULE__, {:validate, uri, data})
+    end
+
+    # In your supervision tree:
+    children = [
+      {Aether.ATProto.Lexicon.Registry, lexicon_dir: "priv/lexicons"}
+    ]
+
+  Pros:
+  - Supervised process - auto-restarts on crash
+  - Caller is isolated from crashes
+  - Can reload schemas on restart
+  - Can add monitoring/telemetry
+
+  Cons:
+  - Slower than Persistent Term (single process bottleneck)
+  - All validations serialize through one process
+
+  Option 2: Persistent Term + Task Isolation (Best Balance)
+
+  # Fast reads from Persistent Term
+  # Wrap validation in supervised task for isolation
+
+  defmodule Aether.ATProto.Lexicon.Registry do
+    # Keep current Persistent Term storage...
+
+    @doc "Safe validation - isolated in a supervised task"
+    def validate_safe(uri, data, timeout \\ 5000) do
+      task = Task.Supervisor.async_nolink(
+        Aether.ATProto.Lexicon.TaskSupervisor,
+        fn -> validate(uri, data) end
+      )
+
+      case Task.yield(task, timeout) || Task.shutdown(task) do
+        {:ok, result} -> result
+        {:exit, reason} -> {:error, "Validation crashed: #{inspect(reason)}"}
+        nil -> {:error, "Validation timeout"}
+      end
+    end
+
+    @doc "Fast validation - no isolation (caller crashes on error)"
+    def validate(uri, data) do
+      # Direct call - fast but risky
+    end
+  end
+
+  Pros:
+  - Keeps fast Persistent Term reads
+  - Isolated validation won't crash caller
+  - Can timeout long-running validations
+  - Users choose: validate/2 (fast) or validate_safe/2 (safe)
+
+  Cons:
+  - Task overhead (~10-50μs)
+  - Requires Task.Supervisor in your app
+
+  Option 3: ETS + Supervised Owner (Middle Ground)
+
+  defmodule Aether.ATProto.Lexicon.Registry do
+    use GenServer
+
+    def init(_) do
+      # ETS table owned by this GenServer
+      table = :ets.new(:lexicons, [:named_table, :public, :set,
+                                    read_concurrency: true,
+                                    heir: :none])
+      # Load lexicons...
+      {:ok, %{table: table}}
+    end
+
+    # Reads go directly to ETS (fast, no process)
+    def get(uri) do
+      case :ets.lookup(:lexicons, uri) do
+        [{^uri, doc}] -> {:ok, doc}
+        [] -> {:error, :not_found}
+      end
+    end
+
+    def validate(uri, data) do
+      # Direct ETS read + validation (caller still at risk)
+      with {:ok, schema} <- get(uri) do
+        Validation.validate(schema, data)
+      end
+    end
+  end
+
+  Pros:
+  - Fast concurrent reads (near Persistent Term speed)
+  - Supervised GenServer for lifecycle management
+  - Can use heir to preserve table on crash
+
+  Cons:
+  - More complex than Persistent Term
+  - Validation still crashes caller
+
+  My Recommendation
+
+  Use Hybrid Approach: Persistent Term + Optional Task Isolation
+
+  defmodule Aether.ATProto.Lexicon.Registry do
+    # Your app's supervision tree
+    children = [
+      {Task.Supervisor, name: Aether.ATProto.Lexicon.TaskSupervisor}
+    ]
+
+    # Fast but risky (for trusted internal use)
+    def validate(uri, data)
+
+    # Safe but slower (for untrusted/external input)
+    def validate_safe(uri, data, opts \\ [])
+  end
+
+  This gives you:
+  1. ✅ Maximum performance for trusted paths (validate/2)
+  2. ✅ Fault isolation for risky paths (validate_safe/3)
+  3. ✅ Simple storage (Persistent Term - no complex ownership)
+  4. ✅ Timeout protection (can abort runaway validations)
+  5. ✅ User choice (fast vs safe)
+
+  Would you like me to implement this hybrid approach, or would you prefer the simpler supervised GenServer approach?
+
+> lets go with   Option 2: Persistent Term + Task Isolation (Best Balance), but because my weekly limit is likely to end soon, I want you to first create a document so that you can restart this session if its iternrupted before you make the module.
+  ⎿  Weekly limit reached ∙ resets Oct 21, 9am
+     /upgrade to increase your usage limit.
+
+  Todos
+  ☒ Explore official JS lexicon registry implementation
+  ☒ Review current Elixir codebase structure
+  ☒ Design registry module interface
+  ☐ Implement registry module with caching
+  ☐ Add tests for registry module
+  ☐ Update documentation and examples

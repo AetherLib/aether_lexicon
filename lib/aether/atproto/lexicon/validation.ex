@@ -1,4 +1,4 @@
-defmodule AetherLexicon.Validation do
+defmodule Aether.ATProto.Lexicon.Validation do
   @moduledoc """
   Validates data against ATProto lexicon schemas.
 
@@ -66,19 +66,19 @@ defmodule AetherLexicon.Validation do
       }
 
       # Valid data
-      AetherLexicon.Validation.validate(schema, "main", %{
+      Aether.ATProto.Lexicon.Validation.validate(schema, "main", %{
         "text" => "Hello world!",
         "createdAt" => "2024-01-01T00:00:00Z"
       })
       #=> {:ok, %{"text" => "Hello world!", "createdAt" => "2024-01-01T00:00:00Z"}}
 
       # Invalid data (missing required field)
-      AetherLexicon.Validation.validate(schema, "main", %{})
+      Aether.ATProto.Lexicon.Validation.validate(schema, "main", %{})
       #=> {:error, "main must have the property \\"text\\""}
 
       # Invalid data (string too long)
       long_text = String.duplicate("a", 301)
-      AetherLexicon.Validation.validate(schema, "main", %{"text" => long_text})
+      Aether.ATProto.Lexicon.Validation.validate(schema, "main", %{"text" => long_text})
       #=> {:error, "main/text must not be longer than 300 characters"}
   """
 

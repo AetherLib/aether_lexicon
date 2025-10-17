@@ -1,4 +1,4 @@
-defmodule AetherLexicon.ValidationTest do
+defmodule Aether.ATProto.Lexicon.ValidationTest do
   use ExUnit.Case, async: true
 
   # Helper function to load schema from JSON file
@@ -218,7 +218,7 @@ defmodule AetherLexicon.ValidationTest do
         "cts" => "2024-01-15T10:30:00Z"
       }
 
-      assert {:ok, _validated} = AetherLexicon.validate(schema, "label", valid_label)
+      assert {:ok, _validated} = Aether.ATProto.Lexicon.validate(schema, "label", valid_label)
     end
 
     test "rejects label object missing required fields", %{schema: schema} do
@@ -229,7 +229,7 @@ defmodule AetherLexicon.ValidationTest do
         "val" => "test-label"
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "label", invalid_label)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "label", invalid_label)
       assert error =~ "must have the property"
       assert error =~ "cts"
     end
@@ -244,7 +244,8 @@ defmodule AetherLexicon.ValidationTest do
         "ver" => 1
       }
 
-      assert {:ok, _validated} = AetherLexicon.validate(schema, "label", label_with_optional)
+      assert {:ok, _validated} =
+               Aether.ATProto.Lexicon.validate(schema, "label", label_with_optional)
     end
 
     test "validates string maxLength constraint", %{schema: schema} do
@@ -258,7 +259,7 @@ defmodule AetherLexicon.ValidationTest do
         "cts" => "2024-01-15T10:30:00Z"
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "label", invalid_label)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "label", invalid_label)
       assert error =~ "must not be longer than 128 characters"
     end
   end
@@ -274,13 +275,16 @@ defmodule AetherLexicon.ValidationTest do
         "val" => "content-warning"
       }
 
-      assert {:ok, _validated} = AetherLexicon.validate(schema, "selfLabel", valid_self_label)
+      assert {:ok, _validated} =
+               Aether.ATProto.Lexicon.validate(schema, "selfLabel", valid_self_label)
     end
 
     test "rejects selfLabel missing required val field", %{schema: schema} do
       invalid_self_label = %{}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "selfLabel", invalid_self_label)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "selfLabel", invalid_self_label)
+
       assert error =~ "must have the property"
       assert error =~ "val"
     end
@@ -301,7 +305,7 @@ defmodule AetherLexicon.ValidationTest do
         "neg" => true
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "label", label_with_bool)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "label", label_with_bool)
 
       # Invalid boolean
       label_with_invalid_bool = %{
@@ -312,7 +316,9 @@ defmodule AetherLexicon.ValidationTest do
         "neg" => "not a boolean"
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "label", label_with_invalid_bool)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "label", label_with_invalid_bool)
+
       assert error =~ "boolean"
     end
 
@@ -325,7 +331,7 @@ defmodule AetherLexicon.ValidationTest do
         "ver" => 1
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "label", label_with_int)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "label", label_with_int)
 
       # Invalid integer
       label_with_invalid_int = %{
@@ -336,7 +342,9 @@ defmodule AetherLexicon.ValidationTest do
         "ver" => "not an integer"
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "label", label_with_invalid_int)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "label", label_with_invalid_int)
+
       assert error =~ "integer"
     end
   end
@@ -346,7 +354,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{}
 
-      assert {:ok, result} = AetherLexicon.validate(schema, "withDefaults", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "withDefaults", data)
       assert result["stringWithDefault"] == "default_value"
     end
 
@@ -354,7 +362,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{}
 
-      assert {:ok, result} = AetherLexicon.validate(schema, "withDefaults", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "withDefaults", data)
       assert result["intWithDefault"] == 42
     end
 
@@ -362,7 +370,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{}
 
-      assert {:ok, result} = AetherLexicon.validate(schema, "withDefaults", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "withDefaults", data)
       assert result["boolWithDefault"] == true
     end
 
@@ -370,7 +378,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"stringWithDefault" => "custom", "intWithDefault" => 99}
 
-      assert {:ok, result} = AetherLexicon.validate(schema, "withDefaults", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "withDefaults", data)
       assert result["stringWithDefault"] == "custom"
       assert result["intWithDefault"] == 99
     end
@@ -390,7 +398,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"value" => nil}
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert result["value"] == "default_text"
     end
 
@@ -409,7 +417,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"count" => nil}
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert result["count"] == 42
     end
 
@@ -428,7 +436,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"flag" => nil}
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert result["flag"] == true
     end
 
@@ -449,7 +457,7 @@ defmodule AetherLexicon.ValidationTest do
 
       data = %{"value" => nil}
       # Since default type doesn't match, get_default_value returns nil, so value stays nil
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert result["value"] == nil
     end
   end
@@ -467,7 +475,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, "fallback"} = AetherLexicon.validate(schema, "main", nil)
+      assert {:ok, "fallback"} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
     end
 
     test "rejects nil string without default" do
@@ -481,7 +489,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be a string"
     end
 
@@ -497,7 +505,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be a string"
     end
 
@@ -513,7 +521,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, 99} = AetherLexicon.validate(schema, "main", nil)
+      assert {:ok, 99} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
     end
 
     test "rejects nil integer without default" do
@@ -527,7 +535,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be an integer"
     end
 
@@ -543,7 +551,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be an integer"
     end
 
@@ -559,7 +567,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, false} = AetherLexicon.validate(schema, "main", nil)
+      assert {:ok, false} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
     end
 
     test "rejects nil boolean without default" do
@@ -573,7 +581,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be a boolean"
     end
 
@@ -589,7 +597,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", nil)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", nil)
       assert error =~ "must be a boolean"
     end
   end
@@ -599,14 +607,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"nullableField" => nil}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withNullable", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withNullable", data)
     end
 
     test "accepts value for nullable field" do
       schema = test_schema()
       data = %{"nullableField" => "some value"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withNullable", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withNullable", data)
     end
   end
 
@@ -615,14 +623,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"stringEnum" => "option2"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withEnum", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withEnum", data)
     end
 
     test "rejects invalid string enum value" do
       schema = test_schema()
       data = %{"stringEnum" => "invalid_option"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withEnum", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withEnum", data)
       assert error =~ "must be one of"
     end
 
@@ -630,14 +638,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"intEnum" => 2}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withEnum", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withEnum", data)
     end
 
     test "rejects invalid integer enum value" do
       schema = test_schema()
       data = %{"intEnum" => 99}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withEnum", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withEnum", data)
       assert error =~ "must be one of"
     end
   end
@@ -647,14 +655,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"stringConst" => "fixed_value"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
     end
 
     test "rejects non-matching const string value" do
       schema = test_schema()
       data = %{"stringConst" => "wrong_value"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
       assert error =~ "must be fixed_value"
     end
 
@@ -662,14 +670,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"intConst" => 100}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
     end
 
     test "rejects non-matching const integer value" do
       schema = test_schema()
       data = %{"intConst" => 99}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
       assert error =~ "must be 100"
     end
 
@@ -677,14 +685,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"boolConst" => true}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
     end
 
     test "rejects non-matching const boolean value" do
       schema = test_schema()
       data = %{"boolConst" => false}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withConst", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withConst", data)
       assert error =~ "must be true"
     end
   end
@@ -694,14 +702,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"items" => ["one", "two", "three"]}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "arrayDef", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "arrayDef", data)
     end
 
     test "rejects array with non-string items" do
       schema = test_schema()
       data = %{"items" => ["one", 2, "three"]}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "arrayDef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "arrayDef", data)
       assert error =~ "must be a string"
     end
 
@@ -709,7 +717,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"items" => []}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "arrayDef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "arrayDef", data)
       assert error =~ "must not have fewer than 1 elements"
     end
 
@@ -717,7 +725,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"items" => ["a", "b", "c", "d", "e", "f"]}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "arrayDef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "arrayDef", data)
       assert error =~ "must not have more than 5 elements"
     end
 
@@ -725,7 +733,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"items" => "not an array"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "arrayDef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "arrayDef", data)
       assert error =~ "must be an array"
     end
   end
@@ -741,7 +749,7 @@ defmodule AetherLexicon.ValidationTest do
         ]
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "arrayWithRefs", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "arrayWithRefs", data)
     end
 
     test "rejects invalid items in ref array" do
@@ -755,7 +763,7 @@ defmodule AetherLexicon.ValidationTest do
         ]
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "arrayWithRefs", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "arrayWithRefs", data)
       assert error =~ "must have the property"
     end
   end
@@ -765,14 +773,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"refField" => %{"name" => "test"}}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "withRef", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "withRef", data)
     end
 
     test "rejects invalid object in ref field" do
       schema = test_schema()
       data = %{"refField" => %{}}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "withRef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "withRef", data)
       assert error =~ "must have the property"
     end
   end
@@ -782,21 +790,21 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"$type" => "#simpleObject", "name" => "test"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "openUnion", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "openUnion", data)
     end
 
     test "accepts unknown type in open union" do
       schema = test_schema()
       data = %{"$type" => "#unknownType", "data" => "anything"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "openUnion", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "openUnion", data)
     end
 
     test "rejects missing $type field" do
       schema = test_schema()
       data = %{"name" => "test"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "openUnion", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "openUnion", data)
       assert error =~ "must be an object which includes the \"$type\" property"
     end
   end
@@ -806,14 +814,14 @@ defmodule AetherLexicon.ValidationTest do
       schema = test_schema()
       data = %{"$type" => "#simpleObject", "name" => "test"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "closedUnion", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "closedUnion", data)
     end
 
     test "rejects unknown type in closed union" do
       schema = test_schema()
       data = %{"$type" => "#unknownType", "data" => "anything"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "closedUnion", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "closedUnion", data)
       assert error =~ "$type must be one of"
     end
   end
@@ -834,7 +842,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => <<1, 2, 3, 4, 5>>}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates bytes maxLength constraint" do
@@ -852,7 +860,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => <<1, 2, 3, 4, 5, 6>>}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must not be larger than 5 bytes"
     end
 
@@ -871,7 +879,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => <<1, 2, 3>>}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must not be smaller than 10 bytes"
     end
   end
@@ -892,7 +900,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"cid" => "QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "rejects invalid CID" do
@@ -910,7 +918,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"cid" => "not-a-cid"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a CID"
     end
   end
@@ -931,7 +939,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => %{"anything" => "goes", "nested" => %{"data" => 123}}}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "rejects non-object for unknown type" do
@@ -949,7 +957,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => "not an object"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be an object"
     end
   end
@@ -978,7 +986,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates blob with ref and mimeType" do
@@ -1002,7 +1010,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "rejects invalid blob structure" do
@@ -1020,7 +1028,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"image" => %{"something" => "else"}}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "should be a blob ref"
     end
   end
@@ -1041,7 +1049,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"marker" => "anything"}
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       # Token type returns nil
       assert result["marker"] == nil
     end
@@ -1058,7 +1066,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # The 'main' def is a record type with a nested 'record' object
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1079,11 +1087,11 @@ defmodule AetherLexicon.ValidationTest do
 
       # String with exactly 10 graphemes
       data = %{"text" => "1234567890"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
 
       # String with more than 10 graphemes
       long_data = %{"text" => "12345678901"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", long_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", long_data)
       assert error =~ "must not be longer than 10 graphemes"
     end
 
@@ -1103,7 +1111,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # String shorter than minGraphemes
       data = %{"text" => "1234"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must not be shorter than 5 graphemes"
     end
 
@@ -1122,7 +1130,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"text" => "hello world"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1142,7 +1150,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"count" => -1}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "can not be less than 0"
     end
 
@@ -1161,7 +1169,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"count" => 101}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "can not be greater than 100"
     end
   end
@@ -1172,7 +1180,9 @@ defmodule AetherLexicon.ValidationTest do
       # Short string that passes initial check but fails UTF-8 count
       data = %{"text" => "short"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "stringWithMinLength", data)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "stringWithMinLength", data)
+
       assert error =~ "must not be shorter than 10 characters"
     end
 
@@ -1181,7 +1191,9 @@ defmodule AetherLexicon.ValidationTest do
       # String with exactly required graphemes at boundary
       data = %{"text" => "test"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "stringWithMinGraphemes", data)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "stringWithMinGraphemes", data)
+
       assert error =~ "must not be shorter than 5 graphemes"
     end
 
@@ -1191,7 +1203,9 @@ defmodule AetherLexicon.ValidationTest do
       long_text = String.duplicate("a", 51)
       data = %{"text" => long_text}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "stringWithMinGraphemes", data)
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate(schema, "stringWithMinGraphemes", data)
+
       assert error =~ "must not be longer than 50 graphemes"
     end
 
@@ -1211,7 +1225,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # String with length * 3 < minLength triggers fast-path error
       data = %{"text" => "a"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must not be shorter than 100 characters"
     end
 
@@ -1231,7 +1245,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # String that passes byte count check in else branch
       data = %{"text" => "hello world"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1240,7 +1254,7 @@ defmodule AetherLexicon.ValidationTest do
       schema = edge_case_schema()
       data = %{}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "unsupportedType", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "unsupportedType", data)
       assert error =~ "Unsupported type"
     end
 
@@ -1249,14 +1263,14 @@ defmodule AetherLexicon.ValidationTest do
       # Enum that's not a list - should pass through
       data = %{"value" => "anything"}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "invalidEnumType", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "invalidEnumType", data)
     end
 
     test "validates non-list integer enum gracefully" do
       schema = edge_case_schema()
       data = %{"value" => 42}
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "invalidIntEnumType", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "invalidIntEnumType", data)
     end
   end
 
@@ -1266,7 +1280,7 @@ defmodule AetherLexicon.ValidationTest do
       data = %{"ref" => %{"data" => "test"}}
 
       # Should fail because we can't resolve cross-schema refs yet
-      assert {:error, error} = AetherLexicon.validate(schema, "crossSchemaRef", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "crossSchemaRef", data)
       assert error =~ "not found in schema"
     end
 
@@ -1275,7 +1289,7 @@ defmodule AetherLexicon.ValidationTest do
       data = %{"ref" => %{"name" => "test"}}
 
       # Should resolve to main definition
-      assert {:ok, _} = AetherLexicon.validate(schema, "implicitMain", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "implicitMain", data)
     end
 
     test "handles union ref error path" do
@@ -1293,7 +1307,7 @@ defmodule AetherLexicon.ValidationTest do
 
       data = %{"$type" => "#nonexistent"}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "not found"
     end
 
@@ -1313,7 +1327,7 @@ defmodule AetherLexicon.ValidationTest do
 
       data = %{"field" => %{}}
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "not found"
     end
   end
@@ -1331,7 +1345,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "not an object")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "not an object")
       assert error =~ "Expected object"
     end
 
@@ -1350,7 +1364,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"data" => 123}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a byte array"
     end
 
@@ -1369,7 +1383,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"cid" => 123}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a CID"
     end
 
@@ -1388,7 +1402,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"image" => "not a blob"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "should be a blob ref"
     end
 
@@ -1404,7 +1418,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", %{})
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", %{})
       assert error =~ "Invalid record definition"
     end
   end
@@ -1428,7 +1442,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"$type" => "lex:#simpleType", "name" => "test"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "handles refs with implicit #main suffix" do
@@ -1449,7 +1463,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"$type" => "lex:test.schema#main", "name" => "test"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "unionType", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "unionType", data)
     end
 
     test "handles refs without # converting to #main" do
@@ -1470,7 +1484,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"$type" => "lex:test.schema", "name" => "test"}
-      assert {:error, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1490,7 +1504,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"uri" => "at://did:plc:abc123/app.bsky.feed.post/3k2y"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates handle format through dispatcher" do
@@ -1508,7 +1522,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"handle" => "user.bsky.social"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates at-identifier format through dispatcher" do
@@ -1526,7 +1540,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"identifier" => "did:plc:abc123"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates nsid format through dispatcher" do
@@ -1544,7 +1558,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"nsid" => "com.example.type"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates cid format through dispatcher" do
@@ -1562,7 +1576,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"cid" => "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates language format through dispatcher" do
@@ -1580,7 +1594,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"lang" => "en-US"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates tid format through dispatcher" do
@@ -1598,7 +1612,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"tid" => "3jzfcijpj2z2a"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates record-key format through dispatcher" do
@@ -1616,7 +1630,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"key" => "my-record.key_123"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1637,7 +1651,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # Space is not allowed in record keys
       data = %{"key" => "invalid key with spaces"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a valid Record Key"
     end
 
@@ -1656,7 +1670,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"key" => "invalid\nkey"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a valid Record Key"
     end
 
@@ -1675,7 +1689,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       data = %{"key" => "invalid\tkey"}
-      assert {:error, error} = AetherLexicon.validate(schema, "main", data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", data)
       assert error =~ "must be a valid Record Key"
     end
   end
@@ -1701,7 +1715,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # This will trigger to_lex_uri to convert "test.simpleType" to "lex:test.simpleType"
       data = %{"$type" => "test.simpleType", "name" => "value"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
 
     test "validates union with various ref formats" do
@@ -1723,7 +1737,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # Plain ref without lex: or # will be converted by to_lex_uri
       data = %{"$type" => "other.type", "value" => "test"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", data)
     end
   end
 
@@ -1744,7 +1758,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, "hello"} = AetherLexicon.validate(ref_schema, "other", "hello")
+      assert {:ok, "hello"} = Aether.ATProto.Lexicon.validate(ref_schema, "other", "hello")
     end
 
     test "validates with implicit main reference" do
@@ -1764,7 +1778,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # This should try to get the "main" definition when no # is present
       # For this test, we just verify the code path exists
-      result = AetherLexicon.validate(schema, "main", "test_string")
+      result = Aether.ATProto.Lexicon.validate(schema, "main", "test_string")
       assert {:ok, "test_string"} = result
     end
   end
@@ -1783,8 +1797,10 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, "test"} = AetherLexicon.validate(schema, "test", "test")
-      assert {:ok, "short string"} = AetherLexicon.validate(schema, "test", "short string")
+      assert {:ok, "test"} = Aether.ATProto.Lexicon.validate(schema, "test", "test")
+
+      assert {:ok, "short string"} =
+               Aether.ATProto.Lexicon.validate(schema, "test", "short string")
     end
 
     test "validates string requiring byte count with both min and max" do
@@ -1801,7 +1817,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # This should go through the byte counting path
-      assert {:ok, "test"} = AetherLexicon.validate(schema, "test", "test")
+      assert {:ok, "test"} = Aether.ATProto.Lexicon.validate(schema, "test", "test")
     end
 
     test "validates string with only maxLength but exceeding optimization threshold" do
@@ -1818,7 +1834,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # String with 4 characters, 4 * 3 = 12, which is > 10
       # Should go to byte counting path
-      assert {:ok, "test"} = AetherLexicon.validate(schema, "test", "test")
+      assert {:ok, "test"} = Aether.ATProto.Lexicon.validate(schema, "test", "test")
     end
   end
 
@@ -1826,14 +1842,14 @@ defmodule AetherLexicon.ValidationTest do
     test "returns error for non-existent definition" do
       schema = test_schema()
 
-      assert {:error, error} = AetherLexicon.validate(schema, "nonExistent", %{})
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "nonExistent", %{})
       assert error =~ "not found in schema"
     end
 
     test "returns error for invalid schema structure" do
       invalid_schema = %{"lexicon" => 1, "id" => "test"}
 
-      assert {:error, error} = AetherLexicon.validate(invalid_schema, "main", %{})
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(invalid_schema, "main", %{})
       assert error =~ "missing 'defs' field"
     end
   end
@@ -1859,8 +1875,10 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate_input(schema, "main", %{"text" => "Hello world!"})
-      assert {:error, _} = AetherLexicon.validate_input(schema, "main", %{})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_input(schema, "main", %{"text" => "Hello world!"})
+
+      assert {:error, _} = Aether.ATProto.Lexicon.validate_input(schema, "main", %{})
     end
 
     test "validate_output/3 validates XRPC output data" do
@@ -1884,9 +1902,11 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       assert {:ok, _} =
-               AetherLexicon.validate_output(schema, "main", %{"post" => %{"text" => "Hello"}})
+               Aether.ATProto.Lexicon.validate_output(schema, "main", %{
+                 "post" => %{"text" => "Hello"}
+               })
 
-      assert {:error, _} = AetherLexicon.validate_output(schema, "main", %{})
+      assert {:error, _} = Aether.ATProto.Lexicon.validate_output(schema, "main", %{})
     end
 
     test "validate_parameters/3 validates XRPC parameters with defaults" do
@@ -1908,10 +1928,12 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, result} = AetherLexicon.validate_parameters(schema, "main", %{"q" => "test"})
+      assert {:ok, result} =
+               Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{"q" => "test"})
+
       assert result["limit"] == 25
 
-      assert {:error, _} = AetherLexicon.validate_parameters(schema, "main", %{})
+      assert {:error, _} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{})
     end
 
     test "validate_message/3 validates XRPC subscription message" do
@@ -1934,8 +1956,8 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate_message(schema, "main", %{"seq" => 12345})
-      assert {:error, _} = AetherLexicon.validate_message(schema, "main", %{})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_message(schema, "main", %{"seq" => 12345})
+      assert {:error, _} = Aether.ATProto.Lexicon.validate_message(schema, "main", %{})
     end
 
     test "validate_error/4 validates XRPC error response" do
@@ -1962,12 +1984,12 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       assert {:ok, _} =
-               AetherLexicon.validate_error(schema, "main", "InvalidCredentials", %{
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "InvalidCredentials", %{
                  "message" => "Wrong password"
                })
 
       assert {:error, error} =
-               AetherLexicon.validate_error(schema, "main", "InvalidCredentials", %{})
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "InvalidCredentials", %{})
 
       assert error =~ "must have the property"
     end
@@ -1991,7 +2013,8 @@ defmodule AetherLexicon.ValidationTest do
 
       # Simulate passing non-map data through validate with $xrpc marker
       # This should trigger the error path for non-object in validate_params
-      assert {:ok, _} = AetherLexicon.validate_parameters(schema, "main", %{"q" => "test"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{"q" => "test"})
     end
 
     test "XRPC error validation with unknown error name" do
@@ -2008,7 +2031,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate_error(schema, "main", "UnknownError", %{})
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "UnknownError", %{})
+
       assert error =~ "unknown error 'UnknownError'"
     end
 
@@ -2024,7 +2049,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should pass when no input schema is defined
-      assert {:ok, _} = AetherLexicon.validate_input(schema, "main", %{})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_input(schema, "main", %{})
     end
 
     test "XRPC validates query without output schema" do
@@ -2039,7 +2064,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should pass when no output schema is defined
-      assert {:ok, _} = AetherLexicon.validate_output(schema, "main", %{})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_output(schema, "main", %{})
     end
 
     test "XRPC validates subscription without message schema" do
@@ -2054,7 +2079,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should pass when no message schema is defined
-      assert {:ok, _} = AetherLexicon.validate_message(schema, "main", %{})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_message(schema, "main", %{})
     end
 
     test "XRPC validates endpoint without parameters schema" do
@@ -2069,7 +2094,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should pass when no parameters schema is defined
-      assert {:ok, _} = AetherLexicon.validate_parameters(schema, "main", %{})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{})
     end
 
     test "XRPC error validation without errors list" do
@@ -2083,7 +2108,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate_error(schema, "main", "AnyError", %{})
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "AnyError", %{})
+
       assert error =~ "has no errors defined"
     end
 
@@ -2103,7 +2130,9 @@ defmodule AetherLexicon.ValidationTest do
 
       # Error without schema should accept any data
       assert {:ok, _} =
-               AetherLexicon.validate_error(schema, "main", "SimpleError", %{"anything" => "goes"})
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "SimpleError", %{
+                 "anything" => "goes"
+               })
     end
 
     test "XRPC validates input with alternative schema format (no wrapper)" do
@@ -2124,7 +2153,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate_input(schema, "main", %{"text" => "test"})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate_input(schema, "main", %{"text" => "test"})
     end
 
     test "XRPC validates output with alternative schema format (no wrapper)" do
@@ -2145,7 +2174,8 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate_output(schema, "main", %{"data" => "test"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_output(schema, "main", %{"data" => "test"})
     end
 
     test "XRPC validates message with alternative schema format (no wrapper)" do
@@ -2166,7 +2196,8 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate_message(schema, "main", %{"event" => "update"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_message(schema, "main", %{"event" => "update"})
     end
   end
 
@@ -2185,7 +2216,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # String with 11 bytes
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "12345678901")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "12345678901")
       assert error =~ "must not be longer than 10 characters"
     end
 
@@ -2203,7 +2234,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # String with 5 bytes
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "short")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "short")
       assert error =~ "must not be shorter than 10 characters"
     end
 
@@ -2222,7 +2253,7 @@ defmodule AetherLexicon.ValidationTest do
       # String with exactly 10 chars/bytes - passes the fast path check but need slow path validation
       # This string is 5 chars long, and 5 * 3 = 15 which is >= 10, so it passes fast path
       # But byte_size is only 5, so it will fail in validate_min_bytes
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "short")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "short")
       assert error =~ "must not be shorter than 10 characters"
     end
   end
@@ -2240,7 +2271,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "did:plc:abc123xyz")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "did:plc:abc123xyz")
     end
 
     test "validates at-identifier with handle format" do
@@ -2255,7 +2286,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "user.bsky.social")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "user.bsky.social")
     end
 
     test "rejects invalid at-identifier" do
@@ -2270,7 +2301,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "invalid handle!")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "invalid handle!")
       assert error =~ "must be a valid did or a handle"
     end
   end
@@ -2288,7 +2319,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate(schema, "main", "")
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", "")
       assert error =~ "must be a valid Record Key"
     end
 
@@ -2306,7 +2337,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # Create a string that's > 512 bytes
       long_key = String.duplicate("a", 513)
-      assert {:error, error} = AetherLexicon.validate(schema, "main", long_key)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", long_key)
       assert error =~ "must be a valid Record Key"
     end
 
@@ -2324,7 +2355,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # Create a valid string that's exactly 512 bytes
       valid_key = String.duplicate("a", 512)
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", valid_key)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", valid_key)
     end
   end
 
@@ -2345,7 +2376,7 @@ defmodule AetherLexicon.ValidationTest do
       # Format: subdomain.domain.tld where subdomain is very long
       long_subdomain = String.duplicate("a", 250)
       long_handle = "#{long_subdomain}.example.com"
-      assert {:error, error} = AetherLexicon.validate(schema, "main", long_handle)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", long_handle)
       assert error =~ "must be a valid handle"
     end
 
@@ -2361,7 +2392,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "user.bsky.social")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "user.bsky.social")
     end
   end
 
@@ -2382,7 +2413,7 @@ defmodule AetherLexicon.ValidationTest do
       # Format: domain.subdomain.type
       long_part = String.duplicate("a", 200)
       long_nsid = "#{long_part}.#{long_part}.type"
-      assert {:error, error} = AetherLexicon.validate(schema, "main", long_nsid)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate(schema, "main", long_nsid)
       assert error =~ "must be a valid nsid"
     end
 
@@ -2398,7 +2429,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "com.example.feed.post")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "com.example.feed.post")
     end
   end
 
@@ -2424,7 +2455,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Validate through the crossRef which references selfLabels with cross-schema format
-      assert {:ok, ["test"]} = AetherLexicon.validate(schema, "crossRef", ["test"])
+      assert {:ok, ["test"]} = Aether.ATProto.Lexicon.validate(schema, "crossRef", ["test"])
     end
 
     test "validates ref without # (implicit main)" do
@@ -2445,7 +2476,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # When validating through implicitRef, it should look for "main" since ref has no #
-      assert {:ok, "test"} = AetherLexicon.validate(schema, "implicitRef", "test")
+      assert {:ok, "test"} = Aether.ATProto.Lexicon.validate(schema, "implicitRef", "test")
     end
   end
 
@@ -2476,7 +2507,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should reject unknown type in closed union
-      result = AetherLexicon.validate(schema, "closedUnion", %{"$type" => "unknown"})
+      result = Aether.ATProto.Lexicon.validate(schema, "closedUnion", %{"$type" => "unknown"})
       assert {:error, error_msg} = result
       assert error_msg =~ "must be one of"
     end
@@ -2502,7 +2533,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # Should accept unknown type in open union
       assert {:ok, %{"$type" => "unknown"}} =
-               AetherLexicon.validate(schema, "openUnion", %{"$type" => "unknown"})
+               Aether.ATProto.Lexicon.validate(schema, "openUnion", %{"$type" => "unknown"})
     end
   end
 
@@ -2556,26 +2587,27 @@ defmodule AetherLexicon.ValidationTest do
       input_data = %{"username" => "alice"}
 
       assert {:ok, %{"username" => "alice"}} =
-               AetherLexicon.validate_input(schema, "main", input_data)
+               Aether.ATProto.Lexicon.validate_input(schema, "main", input_data)
     end
 
     test "validates query input by default with validate/3", %{schema: schema} do
       input_data = %{"username" => "bob"}
 
-      assert {:ok, %{"username" => "bob"}} = AetherLexicon.validate(schema, "main", input_data)
+      assert {:ok, %{"username" => "bob"}} =
+               Aether.ATProto.Lexicon.validate(schema, "main", input_data)
     end
 
     test "rejects invalid query input", %{schema: schema} do
       input_data = %{"username" => String.duplicate("a", 51)}
 
-      assert {:error, error} = AetherLexicon.validate_input(schema, "main", input_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_input(schema, "main", input_data)
       assert error =~ "must not be longer than 50"
     end
 
     test "rejects missing required field in query input", %{schema: schema} do
       input_data = %{}
 
-      assert {:error, error} = AetherLexicon.validate_input(schema, "main", input_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_input(schema, "main", input_data)
       assert error =~ "must have the property \"username\""
     end
 
@@ -2587,7 +2619,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, result} = AetherLexicon.validate_output(schema, "main", output_data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_output(schema, "main", output_data)
       assert result["user"]["did"] == "did:plc:abc123"
     end
 
@@ -2599,7 +2631,7 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate_output(schema, "main", output_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_output(schema, "main", output_data)
       assert error =~ "must have the property \"handle\""
     end
   end
@@ -2650,21 +2682,21 @@ defmodule AetherLexicon.ValidationTest do
         "langs" => ["en"]
       }
 
-      assert {:ok, result} = AetherLexicon.validate_input(schema, "main", input_data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_input(schema, "main", input_data)
       assert result["text"] == "Hello, world!"
     end
 
     test "validates procedure input by default with validate/3", %{schema: schema} do
       input_data = %{"text" => "Hello!"}
 
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", input_data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", input_data)
       assert result["text"] == "Hello!"
     end
 
     test "rejects procedure input exceeding max length", %{schema: schema} do
       input_data = %{"text" => String.duplicate("a", 301)}
 
-      assert {:error, error} = AetherLexicon.validate_input(schema, "main", input_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_input(schema, "main", input_data)
       assert error =~ "must not be longer than 300"
     end
 
@@ -2674,7 +2706,7 @@ defmodule AetherLexicon.ValidationTest do
         "cid" => "bafyreiabc123"
       }
 
-      assert {:ok, result} = AetherLexicon.validate_output(schema, "main", output_data)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_output(schema, "main", output_data)
       assert result["uri"] =~ "at://"
     end
 
@@ -2684,7 +2716,7 @@ defmodule AetherLexicon.ValidationTest do
         # Missing required "cid"
       }
 
-      assert {:error, error} = AetherLexicon.validate_output(schema, "main", output_data)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_output(schema, "main", output_data)
       assert error =~ "must have the property \"cid\""
     end
   end
@@ -2726,7 +2758,7 @@ defmodule AetherLexicon.ValidationTest do
         "event" => "commit"
       }
 
-      result = AetherLexicon.validate_message(schema, "main", message_data)
+      result = Aether.ATProto.Lexicon.validate_message(schema, "main", message_data)
       assert {:ok, _} = result
     end
 
@@ -2734,7 +2766,7 @@ defmodule AetherLexicon.ValidationTest do
       # Subscriptions might not have traditional input/output
       data = %{"seq" => 1}
 
-      result = AetherLexicon.validate(schema, "main", data)
+      result = Aether.ATProto.Lexicon.validate(schema, "main", data)
       # Should succeed since no input schema is defined
       assert {:ok, _} = result
     end
@@ -2761,7 +2793,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should accept any input when no input schema defined
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", %{"anything" => "goes"})
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", %{"anything" => "goes"})
     end
   end
 
@@ -2791,11 +2823,12 @@ defmodule AetherLexicon.ValidationTest do
         "action" => "delete"
       }
 
-      assert {:ok, %{"action" => "delete"}} = AetherLexicon.validate(schema, "main", input_data)
+      assert {:ok, %{"action" => "delete"}} =
+               Aether.ATProto.Lexicon.validate(schema, "main", input_data)
 
       # Output validation with no schema should succeed
       output_data = %{"$xrpc" => "output", "anything" => "works"}
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", output_data)
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", output_data)
     end
   end
 
@@ -2844,14 +2877,14 @@ defmodule AetherLexicon.ValidationTest do
     test "validates required parameters using validate_parameters/3", %{schema: schema} do
       params = %{"q" => "test search"}
 
-      assert {:ok, result} = AetherLexicon.validate_parameters(schema, "main", params)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", params)
       assert result["q"] == "test search"
     end
 
     test "applies default values to parameters", %{schema: schema} do
       params = %{"q" => "test"}
 
-      assert {:ok, result} = AetherLexicon.validate_parameters(schema, "main", params)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", params)
       # Default should be applied
       assert result["limit"] == 25
     end
@@ -2862,14 +2895,14 @@ defmodule AetherLexicon.ValidationTest do
         "limit" => 150
       }
 
-      assert {:error, error} = AetherLexicon.validate_parameters(schema, "main", params)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", params)
       assert error =~ "can not be greater than 100"
     end
 
     test "rejects missing required parameters", %{schema: schema} do
       params = %{"limit" => 10}
 
-      assert {:error, error} = AetherLexicon.validate_parameters(schema, "main", params)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", params)
       assert error =~ "must have the parameter \"q\""
     end
 
@@ -2879,7 +2912,7 @@ defmodule AetherLexicon.ValidationTest do
         "cursor" => "abc123"
       }
 
-      assert {:ok, result} = AetherLexicon.validate_parameters(schema, "main", params)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_parameters(schema, "main", params)
       assert result["cursor"] == "abc123"
     end
   end
@@ -2937,7 +2970,12 @@ defmodule AetherLexicon.ValidationTest do
       error_data = %{"message" => "Incorrect username or password"}
 
       assert {:ok, result} =
-               AetherLexicon.validate_error(schema, "main", "InvalidCredentials", error_data)
+               Aether.ATProto.Lexicon.validate_error(
+                 schema,
+                 "main",
+                 "InvalidCredentials",
+                 error_data
+               )
 
       assert result["message"] == "Incorrect username or password"
     end
@@ -2947,7 +2985,12 @@ defmodule AetherLexicon.ValidationTest do
       error_data = %{}
 
       assert {:error, error} =
-               AetherLexicon.validate_error(schema, "main", "InvalidCredentials", error_data)
+               Aether.ATProto.Lexicon.validate_error(
+                 schema,
+                 "main",
+                 "InvalidCredentials",
+                 error_data
+               )
 
       assert error =~ "must have the property \"message\""
     end
@@ -2956,14 +2999,15 @@ defmodule AetherLexicon.ValidationTest do
       error_data = %{"anything" => "works"}
 
       # Should succeed - error has no schema
-      assert {:ok, _} = AetherLexicon.validate_error(schema, "main", "AccountLocked", error_data)
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "AccountLocked", error_data)
     end
 
     test "rejects unknown error name", %{schema: schema} do
       error_data = %{}
 
       assert {:error, error} =
-               AetherLexicon.validate_error(schema, "main", "UnknownError", error_data)
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "UnknownError", error_data)
 
       assert error =~ "unknown error 'UnknownError'"
       assert error =~ "InvalidCredentials, AccountLocked, RateLimited"
@@ -2973,7 +3017,7 @@ defmodule AetherLexicon.ValidationTest do
       error_data = %{"retryAfter" => 60}
 
       assert {:ok, result} =
-               AetherLexicon.validate_error(schema, "main", "RateLimited", error_data)
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "RateLimited", error_data)
 
       assert result["retryAfter"] == 60
     end
@@ -3032,7 +3076,7 @@ defmodule AetherLexicon.ValidationTest do
         "repo" => "did:plc:abc123"
       }
 
-      assert {:ok, result} = AetherLexicon.validate_message(schema, "main", message)
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate_message(schema, "main", message)
       assert result["seq"] == 12345
     end
 
@@ -3043,7 +3087,7 @@ defmodule AetherLexicon.ValidationTest do
         # Missing required "repo"
       }
 
-      assert {:error, error} = AetherLexicon.validate_message(schema, "main", message)
+      assert {:error, error} = Aether.ATProto.Lexicon.validate_message(schema, "main", message)
       assert error =~ "must have the property \"repo\""
     end
 
@@ -3054,7 +3098,9 @@ defmodule AetherLexicon.ValidationTest do
         "did" => "did:plc:xyz789"
       }
 
-      assert {:ok, result} = AetherLexicon.validate_message(schema, "main", identity_message)
+      assert {:ok, result} =
+               Aether.ATProto.Lexicon.validate_message(schema, "main", identity_message)
+
       assert result["did"] == "did:plc:xyz789"
     end
   end
@@ -3078,7 +3124,8 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should succeed even with parameters data when no parameters schema defined
-      assert {:ok, _} = AetherLexicon.validate_parameters(schema, "main", %{"anything" => "goes"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{"anything" => "goes"})
     end
 
     test "validates query with nil input definition using validate_input" do
@@ -3099,7 +3146,8 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should succeed when no input schema defined
-      assert {:ok, _} = AetherLexicon.validate_input(schema, "main", %{"anything" => "goes"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_input(schema, "main", %{"anything" => "goes"})
     end
 
     test "validates input with direct schema (without schema wrapper)" do
@@ -3120,7 +3168,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, result} = AetherLexicon.validate_input(schema, "main", %{"action" => "create"})
+      assert {:ok, result} =
+               Aether.ATProto.Lexicon.validate_input(schema, "main", %{"action" => "create"})
+
       assert result["action"] == "create"
     end
 
@@ -3142,7 +3192,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, result} = AetherLexicon.validate_output(schema, "main", %{"status" => "ok"})
+      assert {:ok, result} =
+               Aether.ATProto.Lexicon.validate_output(schema, "main", %{"status" => "ok"})
+
       assert result["status"] == "ok"
     end
 
@@ -3164,7 +3216,8 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should succeed even with message data when no message schema defined
-      assert {:ok, _} = AetherLexicon.validate_message(schema, "main", %{"anything" => "goes"})
+      assert {:ok, _} =
+               Aether.ATProto.Lexicon.validate_message(schema, "main", %{"anything" => "goes"})
     end
 
     test "validates array without items definition" do
@@ -3186,7 +3239,9 @@ defmodule AetherLexicon.ValidationTest do
 
       # Should succeed with any array content when no items schema defined
       assert {:ok, result} =
-               AetherLexicon.validate(schema, "main", %{"tags" => [1, "two", %{"three" => 3}]})
+               Aether.ATProto.Lexicon.validate(schema, "main", %{
+                 "tags" => [1, "two", %{"three" => 3}]
+               })
 
       assert result["tags"] == [1, "two", %{"three" => 3}]
     end
@@ -3210,7 +3265,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       assert {:ok, result} =
-               AetherLexicon.validate_message(schema, "main", %{"event" => "update"})
+               Aether.ATProto.Lexicon.validate_message(schema, "main", %{"event" => "update"})
 
       assert result["event"] == "update"
     end
@@ -3233,7 +3288,9 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Should fail when trying to validate error but no errors are defined
-      assert {:error, error} = AetherLexicon.validate_error(schema, "main", "SomeError", %{})
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate_error(schema, "main", "SomeError", %{})
+
       assert error =~ "has no errors defined"
     end
 
@@ -3256,7 +3313,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Using validate/3 defaults to input validation and should use direct schema
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", %{"key" => "value"})
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", %{"key" => "value"})
       assert result["key"] == "value"
     end
 
@@ -3276,7 +3333,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:error, error} = AetherLexicon.validate_parameters(schema, "main", %{"q" => "test"})
+      assert {:error, error} =
+               Aether.ATProto.Lexicon.validate_parameters(schema, "main", %{"q" => "test"})
+
       assert error =~ "invalid parameters definition"
     end
   end
@@ -3296,7 +3355,7 @@ defmodule AetherLexicon.ValidationTest do
 
       # String with exactly 10 characters, 10 * 3 = 30 >= 5, so passes fast path
       # byte_size is 10 which is >= 5, so should pass the slow path check (validate_min_bytes success path)
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "1234567890")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "1234567890")
     end
 
     test "validates string with both min and max graphemes in valid range" do
@@ -3313,7 +3372,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # String with exactly 10 graphemes - in the valid range (validate_grapheme_range success path)
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "1234567890")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "1234567890")
     end
 
     test "validates unknown string format passes through" do
@@ -3329,7 +3388,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Unknown formats should pass through without validation
-      assert {:ok, _} = AetherLexicon.validate(schema, "main", "any-value-works")
+      assert {:ok, _} = Aether.ATProto.Lexicon.validate(schema, "main", "any-value-works")
     end
 
     test "validates required property with default value transformation" do
@@ -3348,7 +3407,7 @@ defmodule AetherLexicon.ValidationTest do
       }
 
       # Passing nil for required field - should apply default and trigger update_if_changed
-      assert {:ok, result} = AetherLexicon.validate(schema, "main", %{"value" => nil})
+      assert {:ok, result} = Aether.ATProto.Lexicon.validate(schema, "main", %{"value" => nil})
       assert result["value"] == "default"
     end
   end

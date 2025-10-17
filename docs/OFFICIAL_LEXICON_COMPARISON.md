@@ -323,7 +323,7 @@ if (!result.success) {
 
 **Example**:
 ```elixir
-alias AetherLexicon.Validation
+alias Aether.ATProto.Lexicon.Validation
 
 case Validation.validate(schema, "main", data) do
   {:ok, validated_data} ->
@@ -368,7 +368,7 @@ end
 
 **Implementation approach**:
 ```elixir
-defmodule AetherLexicon.Registry do
+defmodule Aether.ATProto.Lexicon.Registry do
   @moduledoc """
   Schema registry for managing multiple lexicon documents.
   """
@@ -399,7 +399,7 @@ end
 
 **Implementation**:
 - Keep current functional validation API
-- Add **optional** `AetherLexicon.Registry` module
+- Add **optional** `Aether.ATProto.Lexicon.Registry` module
 - Users choose based on their needs
 
 **Example**:

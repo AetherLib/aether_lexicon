@@ -1,7 +1,7 @@
-defmodule AetherLexicon.MixProject do
+defmodule Aether.ATProto.Lexicon.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.1.2"
   @source_url "https://github.com/AetherLib/aether_lexicon"
 
   def project do
@@ -44,7 +44,7 @@ defmodule AetherLexicon.MixProject do
 
   defp docs do
     [
-      main: "AetherLexicon",
+      main: "Aether.ATProto.Lexicon",
       source_ref: "v#{@version}",
       source_url: @source_url,
       extras: extras(),
@@ -70,9 +70,7 @@ defmodule AetherLexicon.MixProject do
   defp groups_for_modules do
     [
       Validation: [
-        AetherLexicon.Validation,
-        AetherLexicon.Validation.Formats,
-        AetherLexicon.Validation.Validators
+        Aether.ATProto.Lexicon.Validation
       ]
     ]
   end
