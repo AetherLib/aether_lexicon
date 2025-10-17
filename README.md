@@ -1,5 +1,7 @@
-# AetherLexicon
-ATProto Lexicon in for Elixir.
+# Aether Lexicon
+ATProto Lexicon for Elixir.
+
+Note: this is a work in progress. Currently only doing validation but will likely have more features in the future.
 
 ## Validation Features:
 
