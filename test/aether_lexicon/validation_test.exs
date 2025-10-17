@@ -2972,7 +2972,9 @@ defmodule AetherLexicon.ValidationTest do
     test "validates error with optional fields", %{schema: schema} do
       error_data = %{"retryAfter" => 60}
 
-      assert {:ok, result} = AetherLexicon.validate_error(schema, "main", "RateLimited", error_data)
+      assert {:ok, result} =
+               AetherLexicon.validate_error(schema, "main", "RateLimited", error_data)
+
       assert result["retryAfter"] == 60
     end
   end
@@ -3207,7 +3209,9 @@ defmodule AetherLexicon.ValidationTest do
         }
       }
 
-      assert {:ok, result} = AetherLexicon.validate_message(schema, "main", %{"event" => "update"})
+      assert {:ok, result} =
+               AetherLexicon.validate_message(schema, "main", %{"event" => "update"})
+
       assert result["event"] == "update"
     end
 
