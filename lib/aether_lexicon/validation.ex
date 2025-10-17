@@ -82,10 +82,19 @@ defmodule AetherLexicon.Validation do
       #=> {:error, "main/text must not be longer than 300 characters"}
   """
 
-  alias AetherLexicon.Validation.Formats
-  alias AetherLexicon.Validation.Validators
-
   @type validation_result :: {:ok, any()} | {:error, String.t()}
+
+  # Format validation regex patterns (from Formats module)
+  @iso8601_regex ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?$/
+  @uri_regex ~r/^\w+:(?:\/\/)?[^\s\/][^\s]*$/
+  @at_uri_regex ~r/^at:\/\/[a-zA-Z0-9:._-]+\/[a-z][a-z0-9.-]*\.[a-z][a-z0-9.-]*[a-z]\/[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/
+  @did_regex ~r/^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$/
+  @handle_regex ~r/^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/
+  @nsid_regex ~r/^[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?:\.[a-zA-Z](?:[a-zA-Z0-9]{0,62})?)$/
+  @cid_format_regex ~r/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,}|[a-z0-9]{59,})$/
+  @language_regex ~r/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?(-[a-zA-Z0-9]{5,8})*(-[a-zA-Z0-9]{1,8})*$/
+  @tid_regex ~r/^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/
+  @record_key_regex ~r/^[a-zA-Z0-9._~:@!$&'()*+,;=%[\]-]+$/
 
   @doc """
   Validates data against a lexicon schema definition.
@@ -501,7 +510,7 @@ defmodule AetherLexicon.Validation do
 
   # Array validation
   defp validate_array(schema, path, definition, value) when is_list(value) do
-    with :ok <- Validators.validate_length(value,
+    with :ok <- validate_length(value,
                   [min_length: definition["minLength"], max_length: definition["maxLength"]],
                   path, "elements"),
          {:ok, _} <- validate_array_items(schema, path, definition, value) do
@@ -534,8 +543,8 @@ defmodule AetherLexicon.Validation do
 
   # String validation
   defp validate_string(path, definition, value) when is_binary(value) do
-    with :ok <- Validators.validate_const(value, definition["const"], path),
-         :ok <- Validators.validate_enum(value, definition["enum"], path),
+    with :ok <- validate_const(value, definition["const"], path),
+         :ok <- validate_enum(value, definition["enum"], path),
          :ok <- validate_string_length(definition, value, path),
          :ok <- validate_string_graphemes(definition, value, path),
          {:ok, _} <- validate_string_format(definition, value, path) do
@@ -544,7 +553,7 @@ defmodule AetherLexicon.Validation do
   end
 
   defp validate_string(path, definition, nil) do
-    case Validators.get_default("string", definition["default"]) do
+    case get_default("string", definition["default"]) do
       nil -> {:error, "#{path} must be a string"}
       default -> {:ok, default}
     end
@@ -678,22 +687,22 @@ defmodule AetherLexicon.Validation do
   defp validate_max_graphemes(_length, _max, _path), do: :ok
 
   defp validate_string_format(%{"format" => format}, value, path),
-    do: Formats.validate_format(format, value, path)
+    do: validate_format(format, value, path)
 
   defp validate_string_format(_definition, value, _path), do: {:ok, value}
 
   # Integer validation
   defp validate_integer(path, definition, value) when is_integer(value) do
-    with :ok <- Validators.validate_const(value, definition["const"], path),
-         :ok <- Validators.validate_enum(value, definition["enum"], path),
-         :ok <- Validators.validate_range(value,
+    with :ok <- validate_const(value, definition["const"], path),
+         :ok <- validate_enum(value, definition["enum"], path),
+         :ok <- validate_range(value,
                   [minimum: definition["minimum"], maximum: definition["maximum"]], path) do
       {:ok, value}
     end
   end
 
   defp validate_integer(path, definition, nil) do
-    case Validators.get_default("integer", definition["default"]) do
+    case get_default("integer", definition["default"]) do
       nil -> {:error, "#{path} must be an integer"}
       default -> {:ok, default}
     end
@@ -705,13 +714,13 @@ defmodule AetherLexicon.Validation do
 
   # Boolean validation
   defp validate_boolean(path, definition, value) when is_boolean(value) do
-    with :ok <- Validators.validate_const(value, definition["const"], path) do
+    with :ok <- validate_const(value, definition["const"], path) do
       {:ok, value}
     end
   end
 
   defp validate_boolean(path, definition, nil) do
-    case Validators.get_default("boolean", definition["default"]) do
+    case get_default("boolean", definition["default"]) do
       nil -> {:error, "#{path} must be a boolean"}
       default -> {:ok, default}
     end
@@ -723,7 +732,7 @@ defmodule AetherLexicon.Validation do
 
   # Bytes validation
   defp validate_bytes(path, definition, value) when is_binary(value) do
-    with :ok <- Validators.validate_length(value,
+    with :ok <- validate_length(value,
                   [min_length: definition["minLength"], max_length: definition["maxLength"]],
                   path, "bytes") do
       {:ok, value}
@@ -944,7 +953,7 @@ defmodule AetherLexicon.Validation do
 
   # Helper: Get default value from definition
   defp get_default_value(%{"type" => type, "default" => default}),
-    do: Validators.get_default(type, default)
+    do: get_default(type, default)
 
   defp get_default_value(_definition), do: nil
 
@@ -973,6 +982,190 @@ defmodule AetherLexicon.Validation do
       get_definition(schema, def_name)
     else
       get_definition(schema, "main")
+    end
+  end
+
+  # ============================================================================
+  # Common validation helpers (from Validators module)
+  # ============================================================================
+
+  # Validates that a numeric value is within the specified range
+  defp validate_range(value, opts, path) when is_number(value) do
+    with :ok <- validate_minimum(value, opts[:minimum], path),
+         :ok <- validate_maximum(value, opts[:maximum], path) do
+      :ok
+    end
+  end
+
+  defp validate_minimum(_value, nil, _path), do: :ok
+  defp validate_minimum(value, min, _path) when value >= min, do: :ok
+  defp validate_minimum(_value, min, path), do: {:error, "#{path} can not be less than #{min}"}
+
+  defp validate_maximum(_value, nil, _path), do: :ok
+  defp validate_maximum(value, max, _path) when value <= max, do: :ok
+  defp validate_maximum(_value, max, path), do: {:error, "#{path} can not be greater than #{max}"}
+
+  # Validates that a collection length is within bounds
+  defp validate_length(value, opts, path, unit) when is_list(value) or is_binary(value) do
+    length = if is_list(value), do: length(value), else: byte_size(value)
+
+    with :ok <- validate_min_length(length, opts[:min_length], path, unit),
+         :ok <- validate_max_length(length, opts[:max_length], path, unit) do
+      :ok
+    end
+  end
+
+  defp validate_min_length(_length, nil, _path, _unit), do: :ok
+  defp validate_min_length(length, min, _path, _unit) when length >= min, do: :ok
+
+  defp validate_min_length(_length, min, path, "elements"),
+    do: {:error, "#{path} must not have fewer than #{min} elements"}
+
+  defp validate_min_length(_length, min, path, "characters"),
+    do: {:error, "#{path} must not be shorter than #{min} characters"}
+
+  defp validate_min_length(_length, min, path, "bytes"),
+    do: {:error, "#{path} must not be smaller than #{min} bytes"}
+
+  defp validate_min_length(_length, min, path, "graphemes"),
+    do: {:error, "#{path} must not be shorter than #{min} graphemes"}
+
+  defp validate_max_length(_length, nil, _path, _unit), do: :ok
+  defp validate_max_length(length, max, _path, _unit) when length <= max, do: :ok
+
+  defp validate_max_length(_length, max, path, "elements"),
+    do: {:error, "#{path} must not have more than #{max} elements"}
+
+  defp validate_max_length(_length, max, path, "characters"),
+    do: {:error, "#{path} must not be longer than #{max} characters"}
+
+  defp validate_max_length(_length, max, path, "bytes"),
+    do: {:error, "#{path} must not be larger than #{max} bytes"}
+
+  defp validate_max_length(_length, max, path, "graphemes"),
+    do: {:error, "#{path} must not be longer than #{max} graphemes"}
+
+  # Validates that a value matches a constant
+  defp validate_const(_value, nil, _path), do: :ok
+  defp validate_const(value, const, _path) when value == const, do: :ok
+  defp validate_const(_value, const, path), do: {:error, "#{path} must be #{const}"}
+
+  # Validates that a value is in an enumeration
+  defp validate_enum(value, enum, path) when is_list(enum) do
+    if value in enum do
+      :ok
+    else
+      {:error, "#{path} must be one of (#{Enum.join(enum, "|")})"}
+    end
+  end
+
+  defp validate_enum(_value, _non_list, _path), do: :ok
+
+  # Returns a default value if it matches the expected type
+  defp get_default("string", default) when is_binary(default), do: default
+  defp get_default("integer", default) when is_integer(default), do: default
+  defp get_default("boolean", default) when is_boolean(default), do: default
+  defp get_default(_type, _default), do: nil
+
+  # ============================================================================
+  # String format validators (from Formats module)
+  # ============================================================================
+
+  # Validates a value against a specific format type
+  defp validate_format("datetime", value, path), do: datetime(path, value)
+  defp validate_format("uri", value, path), do: uri(path, value)
+  defp validate_format("at-uri", value, path), do: at_uri(path, value)
+  defp validate_format("did", value, path), do: did(path, value)
+  defp validate_format("handle", value, path), do: handle(path, value)
+  defp validate_format("at-identifier", value, path), do: at_identifier(path, value)
+  defp validate_format("nsid", value, path), do: nsid(path, value)
+  defp validate_format("cid", value, path), do: cid(path, value)
+  defp validate_format("language", value, path), do: language(path, value)
+  defp validate_format("tid", value, path), do: tid(path, value)
+  defp validate_format("record-key", value, path), do: record_key(path, value)
+  defp validate_format(_unknown_format, value, _path), do: {:ok, value}
+
+  # Validates an ISO 8601 / RFC 3339 datetime string
+  defp datetime(path, value) do
+    validate_with_regex(value, @iso8601_regex, path,
+      "must be an valid atproto datetime (both RFC-3339 and ISO-8601)")
+  end
+
+  # Validates a Decentralized Identifier (DID)
+  defp did(path, value) do
+    validate_with_regex(value, @did_regex, path, "must be a valid did")
+  end
+
+  # Validates a handle in DNS-like format
+  defp handle(path, value) when byte_size(value) > 253 do
+    {:error, "#{path} must be a valid handle"}
+  end
+
+  defp handle(path, value) do
+    validate_with_regex(value, @handle_regex, path, "must be a valid handle")
+  end
+
+  # Validates a Namespace ID (NSID)
+  defp nsid(path, value) when byte_size(value) > 317 do
+    {:error, "#{path} must be a valid nsid"}
+  end
+
+  defp nsid(path, value) do
+    validate_with_regex(value, @nsid_regex, path, "must be a valid nsid")
+  end
+
+  # Generic URI format validation
+  defp uri(path, value) do
+    validate_with_regex(value, @uri_regex, path, "must be a uri")
+  end
+
+  # AT Protocol URI validation
+  defp at_uri(path, value) do
+    validate_with_regex(value, @at_uri_regex, path, "must be a valid at-uri")
+  end
+
+  # AT Identifier (DID or Handle)
+  defp at_identifier(path, "did:" <> _ = value) do
+    validate_did_or_handle(path, value, &did/2)
+  end
+
+  defp at_identifier(path, value) do
+    validate_did_or_handle(path, value, &handle/2)
+  end
+
+  # CID (Content Identifier) validation
+  defp cid(path, value) do
+    validate_with_regex(value, @cid_format_regex, path, "must be a cid string")
+  end
+
+  # BCP 47 language tag validation
+  defp language(path, value) do
+    validate_with_regex(value, @language_regex, path, "must be a well-formed BCP 47 language tag")
+  end
+
+  # TID (Timestamp ID) validation
+  defp tid(path, value) do
+    validate_with_regex(value, @tid_regex, path, "must be a valid TID")
+  end
+
+  # Record Key validation
+  defp record_key(path, value) when byte_size(value) > 512 do
+    {:error, "#{path} must be a valid Record Key"}
+  end
+
+  defp record_key(path, value) when byte_size(value) == 0 do
+    {:error, "#{path} must be a valid Record Key"}
+  end
+
+  defp record_key(path, value) do
+    validate_with_regex(value, @record_key_regex, path, "must be a valid Record Key")
+  end
+
+  # Helper: Validate DID or handle with fallback error message
+  defp validate_did_or_handle(path, value, validator_fun) do
+    case validator_fun.(path, value) do
+      {:ok, _} = result -> result
+      {:error, _} -> {:error, "#{path} must be a valid did or a handle"}
     end
   end
 end

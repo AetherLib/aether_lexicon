@@ -1,7 +1,7 @@
 # AetherLexicon
 ATProto Lexicon in for Elixir.
 
-## Features
+## Validation Features:
 
 - ✅ **Complete ATProto validation** - All primitive types, complex types, IPLD types, and XRPC endpoints
 - ✅ **String format validation** - datetime, URI, DID, handle, NSID, CID, language tags, and more
@@ -192,27 +192,13 @@ The main difference is architectural:
 
 See [docs/OFFICIAL_LEXICON_COMPARISON.md](docs/OFFICIAL_LEXICON_COMPARISON.md) for a detailed comparison.
 
-## Testing
-
-AetherLexicon has comprehensive test coverage:
-
-```bash
-# Run tests
-mix test
-
-# Run with coverage
-mix test --cover
-
-# Current coverage: 99.38% (550 tests)
-```
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT License - see [LICENSE.md](LICENSE.md) for details.
+Apache License - see [LICENSE.md](LICENSE.md) for details.
 
 ## Acknowledgments
 
