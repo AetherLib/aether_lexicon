@@ -413,8 +413,8 @@ defmodule AetherLexicon.Validation do
     do: validate_record(schema, path, definition, value)
 
   defp validate_by_type(schema, path, %{"type" => type} = definition, value)
-      when type in ["query", "procedure", "subscription"],
-    do: validate_xrpc_io(schema, path, definition, value)
+       when type in ["query", "procedure", "subscription"],
+       do: validate_xrpc_io(schema, path, definition, value)
 
   defp validate_by_type(_schema, path, %{"type" => type}, _value),
     do: {:error, "Unsupported type '#{type}' at #{path}"}
@@ -436,7 +436,16 @@ defmodule AetherLexicon.Validation do
   end
 
   # Helper: Validate a single object property using pattern matching
-  defp validate_object_property(schema, path, key, prop_def, original_value, acc_value, required, nullable) do
+  defp validate_object_property(
+         schema,
+         path,
+         key,
+         prop_def,
+         original_value,
+         acc_value,
+         required,
+         nullable
+       ) do
     key_value = Map.get(original_value, key)
 
     # Build validation context
@@ -460,7 +469,13 @@ defmodule AetherLexicon.Validation do
   end
 
   # Nil value for optional (non-required) property - check for defaults
-  defp validate_property_value(%{value: nil, required?: false, key: key, prop_def: prop_def, acc: acc}) do
+  defp validate_property_value(%{
+         value: nil,
+         required?: false,
+         key: key,
+         prop_def: prop_def,
+         acc: acc
+       }) do
     apply_default_value(key, prop_def, acc)
   end
 
@@ -505,14 +520,19 @@ defmodule AetherLexicon.Validation do
   # Helper: Update accumulator only if value changed (guards for efficiency)
   defp update_if_changed(acc_value, _key, original, validated) when original == validated,
     do: acc_value
+
   defp update_if_changed(acc_value, key, _original, validated),
     do: Map.put(acc_value, key, validated)
 
   # Array validation
   defp validate_array(schema, path, definition, value) when is_list(value) do
-    with :ok <- validate_length(value,
-                  [min_length: definition["minLength"], max_length: definition["maxLength"]],
-                  path, "elements"),
+    with :ok <-
+           validate_length(
+             value,
+             [min_length: definition["minLength"], max_length: definition["maxLength"]],
+             path,
+             "elements"
+           ),
          {:ok, _} <- validate_array_items(schema, path, definition, value) do
       {:ok, value}
     end
@@ -576,7 +596,7 @@ defmodule AetherLexicon.Validation do
 
   # Both min and max length constraints
   defp validate_length_constraints(min, max, value, path)
-      when not is_nil(min) and not is_nil(max) do
+       when not is_nil(min) and not is_nil(max) do
     byte_length = byte_size(value)
     validate_byte_range(byte_length, min, max, path)
   end
@@ -593,21 +613,20 @@ defmodule AetherLexicon.Validation do
     validate_max_byte_length(value, string_length, max, path)
   end
 
-  # Fallback for unexpected cases
-  defp validate_length_constraints(_, _, _value, _path), do: :ok
-
   # Validate byte length is within range using guards
   defp validate_byte_range(length, _min, max, path) when length > max,
     do: {:error, "#{path} must not be longer than #{max} characters"}
+
   defp validate_byte_range(length, min, _max, path) when length < min,
     do: {:error, "#{path} must not be shorter than #{min} characters"}
+
   defp validate_byte_range(_length, _min, _max, _path), do: :ok
 
   # Validate minimum byte length with UTF-8 optimization
   # Fast path: if string_length * 3 < min, it's definitely too short
   defp validate_min_byte_length(_value, string_length, min, path)
-      when string_length * 3 < min,
-    do: {:error, "#{path} must not be shorter than #{min} characters"}
+       when string_length * 3 < min,
+       do: {:error, "#{path} must not be shorter than #{min} characters"}
 
   # Slow path: need to check actual byte size
   defp validate_min_byte_length(value, _string_length, min, path) do
@@ -617,13 +636,14 @@ defmodule AetherLexicon.Validation do
 
   defp validate_min_bytes(length, min, path) when length < min,
     do: {:error, "#{path} must not be shorter than #{min} characters"}
+
   defp validate_min_bytes(_length, _min, _path), do: :ok
 
   # Validate maximum byte length with UTF-8 optimization
   # Fast path: if string_length * 3 <= max, it's definitely ok
   defp validate_max_byte_length(_value, string_length, max, _path)
-      when string_length * 3 <= max,
-    do: :ok
+       when string_length * 3 <= max,
+       do: :ok
 
   # Slow path: need to check actual byte size
   defp validate_max_byte_length(value, _string_length, max, path) do
@@ -633,6 +653,7 @@ defmodule AetherLexicon.Validation do
 
   defp validate_max_bytes(length, max, path) when length > max,
     do: {:error, "#{path} must not be longer than #{max} characters"}
+
   defp validate_max_bytes(_length, _max, _path), do: :ok
 
   # String grapheme validation - dispatcher
@@ -648,7 +669,7 @@ defmodule AetherLexicon.Validation do
 
   # Both min and max grapheme constraints
   defp validate_grapheme_constraints(min, max, value, path)
-      when not is_nil(min) and not is_nil(max) do
+       when not is_nil(min) and not is_nil(max) do
     # In Elixir, String.length/1 returns grapheme count (not code units like JavaScript)
     grapheme_length = String.length(value)
     validate_grapheme_range(grapheme_length, min, max, path)
@@ -666,24 +687,25 @@ defmodule AetherLexicon.Validation do
     validate_max_graphemes(grapheme_length, max, path)
   end
 
-  # Fallback for unexpected cases
-  defp validate_grapheme_constraints(_, _, _value, _path), do: :ok
-
   # Validate grapheme count is within range using guards
   defp validate_grapheme_range(length, min, _max, path) when length < min,
     do: {:error, "#{path} must not be shorter than #{min} graphemes"}
+
   defp validate_grapheme_range(length, _min, max, path) when length > max,
     do: {:error, "#{path} must not be longer than #{max} graphemes"}
+
   defp validate_grapheme_range(_length, _min, _max, _path), do: :ok
 
   # Validate minimum grapheme count using guards
   defp validate_min_graphemes(length, min, path) when length < min,
     do: {:error, "#{path} must not be shorter than #{min} graphemes"}
+
   defp validate_min_graphemes(_length, _min, _path), do: :ok
 
   # Validate maximum grapheme count using guards
   defp validate_max_graphemes(length, max, path) when length > max,
     do: {:error, "#{path} must not be longer than #{max} graphemes"}
+
   defp validate_max_graphemes(_length, _max, _path), do: :ok
 
   defp validate_string_format(%{"format" => format}, value, path),
@@ -695,8 +717,12 @@ defmodule AetherLexicon.Validation do
   defp validate_integer(path, definition, value) when is_integer(value) do
     with :ok <- validate_const(value, definition["const"], path),
          :ok <- validate_enum(value, definition["enum"], path),
-         :ok <- validate_range(value,
-                  [minimum: definition["minimum"], maximum: definition["maximum"]], path) do
+         :ok <-
+           validate_range(
+             value,
+             [minimum: definition["minimum"], maximum: definition["maximum"]],
+             path
+           ) do
       {:ok, value}
     end
   end
@@ -732,9 +758,13 @@ defmodule AetherLexicon.Validation do
 
   # Bytes validation
   defp validate_bytes(path, definition, value) when is_binary(value) do
-    with :ok <- validate_length(value,
-                  [min_length: definition["minLength"], max_length: definition["maxLength"]],
-                  path, "bytes") do
+    with :ok <-
+           validate_length(
+             value,
+             [min_length: definition["minLength"], max_length: definition["maxLength"]],
+             path,
+             "bytes"
+           ) do
       {:ok, value}
     end
   end
@@ -855,7 +885,12 @@ defmodule AetherLexicon.Validation do
   end
 
   # Validate errors (named error responses)
-  defp validate_xrpc_io(schema, path, definition, %{"$xrpc" => "error", "$error" => error_name} = data) do
+  defp validate_xrpc_io(
+         schema,
+         path,
+         definition,
+         %{"$xrpc" => "error", "$error" => error_name} = data
+       ) do
     case definition["errors"] do
       nil ->
         {:error, "#{path} has no errors defined"}
@@ -896,11 +931,8 @@ defmodule AetherLexicon.Validation do
   end
 
   # Validate parameters (type: "params")
-  defp validate_params(_schema, path, %{"type" => "params"}, value) when not is_map(value) do
-    {:error, "#{path} must be an object"}
-  end
-
-  defp validate_params(schema, path, %{"type" => "params"} = params_def, value) when is_map(value) do
+  defp validate_params(schema, path, %{"type" => "params"} = params_def, value)
+       when is_map(value) do
     # Parameters are like objects with properties and required fields
     properties = Map.get(params_def, "properties", %{})
     required = Map.get(params_def, "required", [])
@@ -915,39 +947,30 @@ defmodule AetherLexicon.Validation do
     {:error, "#{path} invalid parameters definition"}
   end
 
-  # Helper: Validate a single parameter property
-  defp validate_param_property(schema, path, key, prop_def, acc_value, is_required) do
+  defp validate_param_property(_schema, _path, key, prop_def, acc_value, _is_required = false)
+       when not is_map_key(acc_value, key) or :erlang.map_get(key, acc_value) == nil do
+    case get_default_value(prop_def) do
+      nil -> {:cont, {:ok, acc_value}}
+      default -> {:cont, {:ok, Map.put(acc_value, key, default)}}
+    end
+  end
+
+  defp validate_param_property(_schema, path, key, _prop_def, acc_value, _is_required = true)
+       when not is_map_key(acc_value, key) or :erlang.map_get(key, acc_value) == nil do
+    {:halt, {:error, "#{path} must have the parameter \"#{key}\""}}
+  end
+
+  defp validate_param_property(schema, path, key, prop_def, acc_value, _is_required) do
     param_value = Map.get(acc_value, key)
+    param_path = "#{path}/#{key}"
 
-    case {is_nil(param_value), is_required} do
-      {true, false} ->
-        # Optional parameter - check for defaults
-        case get_default_value(prop_def) do
-          nil -> {:cont, {:ok, acc_value}}
-          default -> {:cont, {:ok, Map.put(acc_value, key, default)}}
-        end
+    case validate_one_of(schema, param_path, prop_def, param_value) do
+      {:ok, validated_value} ->
+        new_acc = update_if_changed(acc_value, key, param_value, validated_value)
+        {:cont, {:ok, new_acc}}
 
-      {true, true} ->
-        # Required parameter missing
-        {:halt, {:error, "#{path} must have the parameter \"#{key}\""}}
-
-      {false, _} ->
-        # Validate the parameter value
-        param_path = "#{path}/#{key}"
-
-        case validate_one_of(schema, param_path, prop_def, param_value) do
-          {:ok, validated_value} ->
-            new_acc =
-              case validated_value != param_value do
-                true -> Map.put(acc_value, key, validated_value)
-                false -> acc_value
-              end
-
-            {:cont, {:ok, new_acc}}
-
-          {:error, _} = error ->
-            {:halt, error}
-        end
+      {:error, _} = error ->
+        {:halt, error}
     end
   end
 
@@ -1021,14 +1044,8 @@ defmodule AetherLexicon.Validation do
   defp validate_min_length(_length, min, path, "elements"),
     do: {:error, "#{path} must not have fewer than #{min} elements"}
 
-  defp validate_min_length(_length, min, path, "characters"),
-    do: {:error, "#{path} must not be shorter than #{min} characters"}
-
   defp validate_min_length(_length, min, path, "bytes"),
     do: {:error, "#{path} must not be smaller than #{min} bytes"}
-
-  defp validate_min_length(_length, min, path, "graphemes"),
-    do: {:error, "#{path} must not be shorter than #{min} graphemes"}
 
   defp validate_max_length(_length, nil, _path, _unit), do: :ok
   defp validate_max_length(length, max, _path, _unit) when length <= max, do: :ok
@@ -1036,14 +1053,8 @@ defmodule AetherLexicon.Validation do
   defp validate_max_length(_length, max, path, "elements"),
     do: {:error, "#{path} must not have more than #{max} elements"}
 
-  defp validate_max_length(_length, max, path, "characters"),
-    do: {:error, "#{path} must not be longer than #{max} characters"}
-
   defp validate_max_length(_length, max, path, "bytes"),
     do: {:error, "#{path} must not be larger than #{max} bytes"}
-
-  defp validate_max_length(_length, max, path, "graphemes"),
-    do: {:error, "#{path} must not be longer than #{max} graphemes"}
 
   # Validates that a value matches a constant
   defp validate_const(_value, nil, _path), do: :ok
@@ -1087,8 +1098,12 @@ defmodule AetherLexicon.Validation do
 
   # Validates an ISO 8601 / RFC 3339 datetime string
   defp datetime(path, value) do
-    validate_with_regex(value, @iso8601_regex, path,
-      "must be an valid atproto datetime (both RFC-3339 and ISO-8601)")
+    validate_with_regex(
+      value,
+      @iso8601_regex,
+      path,
+      "must be an valid atproto datetime (both RFC-3339 and ISO-8601)"
+    )
   end
 
   # Validates a Decentralized Identifier (DID)

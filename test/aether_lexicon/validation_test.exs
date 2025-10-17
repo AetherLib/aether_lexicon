@@ -3278,4 +3278,76 @@ defmodule AetherLexicon.ValidationTest do
       assert error =~ "invalid parameters definition"
     end
   end
+
+  describe "additional edge cases for remaining coverage" do
+    test "validates string with minLength that passes slow path byte check" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "test",
+        "defs" => %{
+          "main" => %{
+            "type" => "string",
+            "minLength" => 5
+          }
+        }
+      }
+
+      # String with exactly 10 characters, 10 * 3 = 30 >= 5, so passes fast path
+      # byte_size is 10 which is >= 5, so should pass the slow path check (validate_min_bytes success path)
+      assert {:ok, _} = Validation.validate(schema, "main", "1234567890")
+    end
+
+    test "validates string with both min and max graphemes in valid range" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "test",
+        "defs" => %{
+          "main" => %{
+            "type" => "string",
+            "minGraphemes" => 5,
+            "maxGraphemes" => 20
+          }
+        }
+      }
+
+      # String with exactly 10 graphemes - in the valid range (validate_grapheme_range success path)
+      assert {:ok, _} = Validation.validate(schema, "main", "1234567890")
+    end
+
+    test "validates unknown string format passes through" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "test",
+        "defs" => %{
+          "main" => %{
+            "type" => "string",
+            "format" => "unknown-custom-format"
+          }
+        }
+      }
+
+      # Unknown formats should pass through without validation
+      assert {:ok, _} = Validation.validate(schema, "main", "any-value-works")
+    end
+
+    test "validates required property with default value transformation" do
+      schema = %{
+        "lexicon" => 1,
+        "id" => "test",
+        "defs" => %{
+          "main" => %{
+            "type" => "object",
+            "required" => ["value"],
+            "properties" => %{
+              "value" => %{"type" => "string", "default" => "default"}
+            }
+          }
+        }
+      }
+
+      # Passing nil for required field - should apply default and trigger update_if_changed
+      assert {:ok, result} = Validation.validate(schema, "main", %{"value" => nil})
+      assert result["value"] == "default"
+    end
+  end
 end
