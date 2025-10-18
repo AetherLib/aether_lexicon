@@ -34,7 +34,7 @@ packages/lexicon/src/
 ```
 
 ## Lexicon json defintions:
-location: `priv/spec`
+location: `priv/lexicons`
 
 ## Core Architecture Patterns
 

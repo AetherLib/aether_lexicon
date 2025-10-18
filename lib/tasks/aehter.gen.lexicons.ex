@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Aether.Gen.Lexicons do
 
     source_dir = get_source_dir()
 
-    target_dir = Path.join(File.cwd!(), "priv/spec")
+    target_dir = Path.join(File.cwd!(), "priv/lexicons")
 
     patterns = if args == [], do: ["**"], else: args
     dbg(patterns)

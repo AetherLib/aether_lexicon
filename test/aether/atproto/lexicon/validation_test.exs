@@ -16,7 +16,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
   end
 
   # Get all lexicon files at compile time
-  @lexicon_files "priv/spec"
+  @lexicon_files "priv/lexicons"
                  |> Path.join("**/*.json")
                  |> Path.wildcard()
                  |> Enum.sort()
@@ -172,7 +172,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
       # Extract a readable test name from the path
       test_name =
         lexicon_path
-        |> Path.relative_to("priv/spec/")
+        |> Path.relative_to("priv/lexicons/")
         |> Path.rootname()
         |> String.replace("/", ".")
 
@@ -191,7 +191,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
 
     test "found all expected lexicon files" do
       # Verify we're loading a reasonable number of schemas
-      assert length(@lexicon_files) > 0, "No lexicon files found in priv/spec"
+      assert length(@lexicon_files) > 0, "No lexicon files found in priv/lexicons"
 
       assert length(@lexicon_files) > 100,
              "Expected to find many lexicon files, found #{length(@lexicon_files)}"
@@ -206,7 +206,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
 
   describe "validate/3 - label object" do
     setup do
-      {:ok, schema} = load_schema("priv/spec/com/atproto/label/defs.json")
+      {:ok, schema} = load_schema("priv/lexicons/com/atproto/label/defs.json")
       {:ok, schema: schema}
     end
 
@@ -266,7 +266,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
 
   describe "validate/3 - selfLabel object" do
     setup do
-      {:ok, schema} = load_schema("priv/spec/com/atproto/label/defs.json")
+      {:ok, schema} = load_schema("priv/lexicons/com/atproto/label/defs.json")
       {:ok, schema: schema}
     end
 
@@ -292,7 +292,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
 
   describe "validate/3 - primitive types" do
     setup do
-      {:ok, schema} = load_schema("priv/spec/com/atproto/label/defs.json")
+      {:ok, schema} = load_schema("priv/lexicons/com/atproto/label/defs.json")
       {:ok, schema: schema}
     end
 
@@ -1057,7 +1057,7 @@ defmodule Aether.ATProto.Lexicon.ValidationTest do
 
   describe "record type validation" do
     test "validates record type with nested object" do
-      {:ok, schema} = load_schema("priv/spec/app/bsky/feed/post.json")
+      {:ok, schema} = load_schema("priv/lexicons/app/bsky/feed/post.json")
 
       # Valid post record
       data = %{

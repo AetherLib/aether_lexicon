@@ -23,7 +23,30 @@ def deps do
 end
 ```
 
-## Quick Start
+## Quick Start:
+
+* Define JSON lexicon schemas or copy some into your priv/lexicons folder.
+* Scaffold elixir modules based on JSON Schemas
+
+### Copy Lexicon JSON Schemas in your priv/lexicon folder.
+
+A mix task is provided for copying the offical schemas.
+You can specify namespace patterns to copy specific lexicons or just copy them all.
+
+```
+mix aether.gen.lexicons "app.bsky.*"
+mix aether.gen.lexicons "app.bsky.actor.*" "com.atproto.*"
+mix aether.gen.lexicons
+```
+
+If no arguments are provided, all avalible lexicons will be copied.
+
+* priv/lexicons/app/bsky/*
+* priv/lexicons/chat/bsky/*
+* priv/lexicons/com/atproto/*
+* priv/lexicons/tools/ozone/*
+
+The lexicons in this mix dep are copied directly via the offical repo https://github.com/bluesky-social/atproto/tree/main/lexicons
 
 ### Basic Validation
 
